@@ -37,8 +37,8 @@ chmod +x setup-nemotron3-nano-llamacpp.sh
 To run unit tests for the setup script:
 
 ```bash
-chmod +x test-setup-nemotron3-nano-llamacpp.sh
-./test-setup-nemotron3-nano-llamacpp.sh
+cd tests/bats
+bats setup-nemotron3-nano-llamacpp.bats
 ```
 
 ## Testing
@@ -53,6 +53,7 @@ Unit tests are provided to verify the functionality of each component of the set
 6. `test_start_server` - Tests starting the llama.cpp server
 
 Tests mock external commands to ensure reliable execution without requiring actual system resources.
+
 
 ## Components
 
