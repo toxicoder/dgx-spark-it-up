@@ -18,6 +18,7 @@ This repository includes:
 - **Development helpers** - Scripts to simplify common development tasks on DGX systems
 - **Benchmarking tools** - Utilities for performance testing and validation
 - **NCCL automation** - Script to automate the complete NCCL setup process for DGX Spark nodes
+- **LLaMA Factory automation** - Script to automate the complete LLaMA Factory workflow for fine-tuning large language models
 
 ## Prerequisites
 
