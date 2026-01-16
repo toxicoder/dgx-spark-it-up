@@ -1,6 +1,7 @@
 {
     "name": "Developer Container",
-    "image": "mcr.microsoft.com/devcontainers/go:1.24-bookworm",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "remoteUser": "vscode",
     "customizations": {
         "vscode": {
             "extensions": [
@@ -56,7 +57,14 @@
                 "bierner.markdown-mermaid",
                 "ecmel.vscode-html-css",
                 "jay-youngn.vscode-proto3-next"
-            ]
+            ],
+            "settings": {
+                "terminal.integrated.shellExecutionOrder": "pTY",
+                "files.exclude": {
+                    "**/node_modules": true,
+                    "**/.git": true
+                }
+            }
         }
     },
     "mounts": [],
@@ -71,5 +79,6 @@
         "ghcr.io/devcontainers/features/node:1": {
             "version": "24"
         }
-    }
+    },
+    "postCreateCommand": "cd /workspaces/dgx-spark-it-up && if [ ! -d \"bats-core\" ]; then git clone https://github.com/bats-core/bats-core.git && cd bats-core && ./install.sh /usr/local; else echo \"bats-core already exists, skipping clone\"; fi"
 }
