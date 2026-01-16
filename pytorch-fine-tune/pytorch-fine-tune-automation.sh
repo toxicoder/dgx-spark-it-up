@@ -83,12 +83,6 @@ verify_requirements() {
         return 1
     fi
     
-    # Check if docker-compose is installed
-    if ! command -v docker-compose &> /dev/null && ! command -v docker &> /dev/null; then
-        print_error "Docker Compose is not installed"
-        return 1
-    fi
-    
     # Check if bash is available
     if ! command -v bash &> /dev/null; then
         print_error "Bash shell is not available"
@@ -143,25 +137,85 @@ EOF
     return 0
 }
 
+# SSH function to execute command on remote node
+ssh_execute() {
+    local node="$1"
+    local command="$2"
+    local timeout="${3:-30}"
+    
+    # SSH to node and execute command with timeout
+    timeout "$timeout" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+        "${FINETUNE_USERNAME:-$USER}@${node}.local" "$command" 2>/dev/null
+}
+
 # Configure network connectivity (Step 1)
 configure_network() {
     print_status "Configuring network connectivity..."
     
-    # This is a placeholder - in a real implementation, this would:
-    # 1. Check physical QSFP cable connections
-    # 2. Configure network interfaces
-    # 3. Set up passwordless SSH
-    # 4. Verify network connectivity
+    # Check if we have manager and worker nodes
+    if [[ -z "${MANAGER_HOSTNAME:-}" ]]; then
+        print_error "Manager hostname not configured"
+        return 1
+    fi
     
-    print_warning "Network configuration requires manual setup according to DGX Spark documentation."
-    print_warning "Please ensure:"
-    print_warning "  - Physical QSFP cable connection is established"
-    print_warning "  - Network interface configuration is complete"
-    print_warning "  - Passwordless SSH is configured"
-    print_warning "  - Network connectivity is verified"
+    if [[ -z "${WORKER_HOSTNAMES:-}" ]]; then
+        print_warning "Worker hostnames not configured. Proceeding with manager node only."
+    fi
     
-    # Ask user to confirm
-    read -rp "Press Enter to continue once network is configured..."
+    # Check if we can SSH to manager node
+    print_status "Testing SSH connectivity to manager node..."
+    if ! ssh_execute "$MANAGER_HOSTNAME" "echo 'SSH test successful'"; then
+        print_error "Cannot SSH to manager node $MANAGER_HOSTNAME"
+        return 1
+    fi
+    
+    print_status "SSH connectivity to manager node verified"
+    
+    # Check if we have worker nodes
+    if [[ -n "${WORKER_HOSTNAMES:-}" ]]; then
+        IFS=',' read -ra WORKERS <<< "$WORKER_HOSTNAMES"
+        for worker in "${WORKERS[@]}"; do
+            print_status "Testing SSH connectivity to worker node $worker..."
+            if ! ssh_execute "$worker" "echo 'SSH test successful'"; then
+                print_error "Cannot SSH to worker node $worker"
+                return 1
+            fi
+            print_status "SSH connectivity to worker node $worker verified"
+        done
+    fi
+    
+    # Check for required network interfaces
+    print_status "Checking network interfaces..."
+    local manager_interfaces
+    manager_interfaces=$(ssh_execute "$MANAGER_HOSTNAME" "ip link show | grep -E 'enp[0-9]+s[0-9]+f[0-9]+' | awk '{print \$2}' | tr -d ':')")
+    
+    if [[ -z "$manager_interfaces" ]]; then
+        print_warning "Could not find expected network interfaces on manager node. Please verify network setup."
+    else
+        print_status "Found network interfaces on manager: $manager_interfaces"
+    fi
+    
+    # Check passwordless SSH
+    print_status "Verifying passwordless SSH setup..."
+    if ssh_execute "$MANAGER_HOSTNAME" "true"; then
+        print_status "Passwordless SSH verified for manager node"
+    else
+        print_warning "Passwordless SSH not working for manager node. Please set up passwordless SSH."
+        return 1
+    fi
+    
+    if [[ -n "${WORKER_HOSTNAMES:-}" ]]; then
+        for worker in "${WORKERS[@]}"; do
+            if ssh_execute "$worker" "true"; then
+                print_status "Passwordless SSH verified for worker node $worker"
+            else
+                print_warning "Passwordless SSH not working for worker node $worker. Please set up passwordless SSH."
+                return 1
+            fi
+        done
+    fi
+    
+    print_status "Network connectivity configured successfully"
     return 0
 }
 
@@ -201,17 +255,28 @@ configure_docker_permissions() {
 install_nvidia_toolkit() {
     print_status "Installing NVIDIA Container Toolkit..."
     
-    # This is a placeholder - actual implementation would check and install:
-    # 1. NVIDIA drivers
-    # 2. NVIDIA Container Toolkit
-    # 3. Docker configuration for NVIDIA Container Toolkit
+    # Install NVIDIA Container Toolkit on manager node
+    print_status "Installing NVIDIA Container Toolkit on manager node..."
+    if ssh_execute "$MANAGER_HOSTNAME" "command -v nvidia-smi >/dev/null 2>&1 && sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit"; then
+        print_status "NVIDIA Container Toolkit installed on manager node"
+    else
+        print_warning "Failed to install NVIDIA Container Toolkit on manager node. Continuing with other steps."
+    fi
     
-    print_warning "NVIDIA Container Toolkit installation requires manual setup."
-    print_warning "Please ensure NVIDIA drivers and NVIDIA Container Toolkit are installed on all nodes."
-    print_warning "Refer to NVIDIA documentation for installation steps."
+    # Install NVIDIA Container Toolkit on worker nodes if they exist
+    if [[ -n "${WORKER_HOSTNAMES:-}" ]]; then
+        IFS=',' read -ra WORKERS <<< "$WORKER_HOSTNAMES"
+        for worker in "${WORKERS[@]}"; do
+            print_status "Installing NVIDIA Container Toolkit on worker node $worker..."
+            if ssh_execute "$worker" "command -v nvidia-smi >/dev/null 2>&1 && sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit"; then
+                print_status "NVIDIA Container Toolkit installed on worker node $worker"
+            else
+                print_warning "Failed to install NVIDIA Container Toolkit on worker node $worker. Continuing with other steps."
+            fi
+        done
+    fi
     
-    # Ask user to confirm
-    read -rp "Press Enter to continue once NVIDIA Container Toolkit is installed on all nodes..."
+    print_status "NVIDIA Container Toolkit installation process initiated"
     return 0
 }
 
@@ -219,61 +284,95 @@ install_nvidia_toolkit() {
 enable_resource_advertising() {
     print_status "Enabling resource advertising..."
     
-    # Find GPU UUID
-    print_status "Finding GPU UUID..."
+    # Find GPU UUID on manager node
+    print_status "Finding GPU UUID on manager node..."
     local gpu_uuid
-    gpu_uuid=$(nvidia-smi -a | grep UUID | awk '{print $3}')
+    gpu_uuid=$(ssh_execute "$MANAGER_HOSTNAME" "nvidia-smi -a | grep UUID | awk '{print \$3}'")
     
     if [[ -z "$gpu_uuid" ]]; then
-        print_error "Failed to retrieve GPU UUID"
+        print_error "Failed to retrieve GPU UUID from manager node"
         return 1
     fi
     
     print_status "Found GPU UUID: $gpu_uuid"
     
-    # Modify Docker daemon configuration
-    print_status "Modifying Docker daemon configuration..."
+    # Modify Docker daemon configuration on manager node
+    print_status "Modifying Docker daemon configuration on manager node..."
     local daemon_config="/etc/docker/daemon.json"
     
     # Create backup
-    if [[ -f "$daemon_config" ]]; then
-        sudo cp "$daemon_config" "${daemon_config}.backup"
-    fi
+    ssh_execute "$MANAGER_HOSTNAME" "sudo cp $daemon_config ${daemon_config}.backup 2>/dev/null || true"
     
-    # Create or update daemon.json
-    sudo tee "$daemon_config" > /dev/null << EOF
+    # Create or update daemon.json on manager node
+    ssh_execute "$MANAGER_HOSTNAME" "sudo tee $daemon_config > /dev/null << EOF
 {
-  "runtimes": {
-    "nvidia": {
-      "path": "nvidia-container-runtime",
-      "runtimeArgs": []
+  \"runtimes\": {
+    \"nvidia\": {
+      \"path\": \"nvidia-container-runtime\",
+      \"runtimeArgs\": []
     }
   },
-  "default-runtime": "nvidia",
-  "node-generic-resources": [
-    "NVIDIA_GPU=$gpu_uuid"
+  \"default-runtime\": \"nvidia\",
+  \"node-generic-resources\": [
+    \"NVIDIA_GPU=$gpu_uuid\"
   ]
 }
-EOF
+EOF"
     
-    print_status "Docker daemon configuration updated"
+    print_status "Docker daemon configuration updated on manager node"
     
-    # Modify nvidia-container-runtime config
-    print_status "Enabling swarm resource advertisement..."
+    # Modify nvidia-container-runtime config on manager node
+    print_status "Enabling swarm resource advertisement on manager node..."
     local runtime_config="/etc/nvidia-container-runtime/config.toml"
     
-    if [[ -f "$runtime_config" ]]; then
-        sudo sed -i 's/^#\s*\(swarm-resource\s*=\s*".*"\)/\1/' "$runtime_config"
-        print_status "Swarm resource advertisement enabled in nvidia-container-runtime config"
+    ssh_execute "$MANAGER_HOSTNAME" "sudo sed -i 's/^#\s*\(swarm-resource\s*=\s*\".*\"\)/\1/' $runtime_config 2>/dev/null || true"
+    print_status "Swarm resource advertisement enabled on manager node"
+    
+    # Restart Docker daemon on manager node
+    print_status "Restarting Docker daemon on manager node..."
+    if ssh_execute "$MANAGER_HOSTNAME" "sudo systemctl restart docker"; then
+        print_status "Docker daemon restarted successfully on manager node"
     else
-        print_warning "nvidia-container-runtime config not found. This may not be an issue."
+        print_warning "Failed to restart Docker daemon on manager node"
     fi
     
-    # Restart Docker daemon
-    print_status "Restarting Docker daemon..."
-    sudo systemctl restart docker
+    # Apply to worker nodes if they exist
+    if [[ -n "${WORKER_HOSTNAMES:-}" ]]; then
+        IFS=',' read -ra WORKERS <<< "$WORKER_HOSTNAMES"
+        for worker in "${WORKERS[@]}"; do
+            print_status "Applying resource advertising to worker node $worker..."
+            
+            # Create backup on worker
+            ssh_execute "$worker" "sudo cp $daemon_config ${daemon_config}.backup 2>/dev/null || true"
+            
+            # Update daemon.json on worker
+            ssh_execute "$worker" "sudo tee $daemon_config > /dev/null << EOF
+{
+  \"runtimes\": {
+    \"nvidia\": {
+      \"path\": \"nvidia-container-runtime\",
+      \"runtimeArgs\": []
+    }
+  },
+  \"default-runtime\": \"nvidia\",
+  \"node-generic-resources\": [
+    \"NVIDIA_GPU=$gpu_uuid\"
+  ]
+}
+EOF"
+            
+            # Enable swarm resource advertisement on worker
+            ssh_execute "$worker" "sudo sed -i 's/^#\s*\(swarm-resource\s*=\s*\".*\"\)/\1/' $runtime_config 2>/dev/null || true"
+            
+            # Restart Docker daemon on worker
+            if ssh_execute "$worker" "sudo systemctl restart docker"; then
+                print_status "Docker daemon restarted successfully on worker node $worker"
+            else
+                print_warning "Failed to restart Docker daemon on worker node $worker"
+            fi
+        done
+    fi
     
-    print_status "Docker daemon restarted successfully"
     log "Resource advertising enabled with GPU UUID: $gpu_uuid"
     return 0
 }
@@ -294,23 +393,23 @@ initialize_swarm() {
         return 0
     fi
     
-    # Initialize swarm
-    print_status "Initializing Docker Swarm on manager node..."
+    # Initialize swarm on manager node
+    print_status "Initializing Docker Swarm on manager node $MANAGER_HOSTNAME..."
     
     # Try to get IP addresses of network interfaces
     local ip1=""
     local ip2=""
     
     # Get first IP address
-    ip1=$(ip -o -4 addr show enp1s0f0np0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+    ip1=$(ssh_execute "$MANAGER_HOSTNAME" "ip -o -4 addr show enp1s0f0np0 2>/dev/null | awk '{print \$4}' | cut -d/ -f1")
     if [[ -z "$ip1" ]]; then
-        ip1=$(ip -o -4 addr show enp1s0f1np1 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+        ip1=$(ssh_execute "$MANAGER_HOSTNAME" "ip -o -4 addr show enp1s0f1np1 2>/dev/null | awk '{print \$4}' | cut -d/ -f1")
     fi
     
     # Get second IP address if available
-    ip2=$(ip -o -4 addr show enp1s0f1np1 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+    ip2=$(ssh_execute "$MANAGER_HOSTNAME" "ip -o -4 addr show enp1s0f1np1 2>/dev/null | awk '{print \$4}' | cut -d/ -f1")
     if [[ -z "$ip2" ]]; then
-        ip2=$(ip -o -4 addr show enp1s0f0np0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+        ip2=$(ssh_execute "$MANAGER_HOSTNAME" "ip -o -4 addr show enp1s0f0np0 2>/dev/null | awk '{print \$4}' | cut -d/ -f1")
     fi
     
     local advertise_addr=""
@@ -323,13 +422,18 @@ initialize_swarm() {
     
     print_debug "Using advertise address: $advertise_addr"
     
-    # Initialize swarm
-    if docker swarm init $advertise_addr; then
-        print_status "Docker Swarm initialized successfully"
-        log "Docker Swarm initialized"
+    # Initialize swarm on manager node
+    local swarm_init_output
+    swarm_init_output=$(ssh_execute "$MANAGER_HOSTNAME" "docker swarm init $advertise_addr 2>&1")
+    
+    if [[ $? -eq 0 ]]; then
+        print_status "Docker Swarm initialized successfully on manager node"
+        echo "$swarm_init_output" | grep -E "(join|token)" > /tmp/swarm_join_info.txt
+        log "Docker Swarm initialized on manager node $MANAGER_HOSTNAME"
         return 0
     else
-        print_error "Failed to initialize Docker Swarm"
+        print_error "Failed to initialize Docker Swarm on manager node"
+        print_error "$swarm_init_output"
         return 1
     fi
 }
@@ -338,31 +442,42 @@ initialize_swarm() {
 join_worker_nodes() {
     print_status "Joining worker nodes to Docker Swarm..."
     
-    # Check if we're on a worker node
+    # Check if we have manager and worker nodes
+    if [[ -z "${MANAGER_HOSTNAME:-}" ]]; then
+        print_error "Manager hostname not configured"
+        return 1
+    fi
+    
     if [[ -z "${WORKER_HOSTNAMES:-}" ]]; then
         print_warning "Worker hostnames not configured. Skipping worker node joining."
         return 0
     fi
     
-    # This is a complex process that would require:
-    # 1. Getting the join token from the manager
-    # 2. Running the join command on each worker
+    # Get the join command from manager node
+    print_status "Retrieving join command from manager node..."
+    local join_command
+    join_command=$(ssh_execute "$MANAGER_HOSTNAME" "docker swarm join-token worker 2>/dev/null | grep -E 'docker swarm join' | head -1")
     
-    print_warning "Worker node joining requires manual execution on each worker node."
-    print_warning "Please run the following command on each worker node:"
-    print_warning "  docker swarm join --token <worker-token> <manager-ip>:<port>"
-    print_warning "The join command will be displayed after manager setup is complete."
-    
-    # Get the join command from manager (simplified approach)
-    if docker info >/dev/null 2>&1 && docker info | grep -q "Swarm: active"; then
-        print_status "Manager node swarm status verified"
-        print_status "Use 'docker swarm join-token worker' on manager to get join command"
-    else
-        print_warning "Not on manager node or swarm not initialized"
+    if [[ -z "$join_command" ]]; then
+        print_error "Failed to retrieve join command from manager node"
+        return 1
     fi
     
-    # Ask user to confirm
-    read -rp "Press Enter after joining all worker nodes..."
+    print_status "Join command retrieved: $join_command"
+    
+    # Execute join command on each worker node
+    IFS=',' read -ra WORKERS <<< "$WORKER_HOSTNAMES"
+    for worker in "${WORKERS[@]}"; do
+        print_status "Joining worker node $worker to swarm..."
+        if ssh_execute "$worker" "$join_command"; then
+            print_status "Worker node $worker successfully joined to swarm"
+        else
+            print_error "Failed to join worker node $worker to swarm"
+            return 1
+        fi
+    done
+    
+    print_status "All worker nodes joined to Docker Swarm"
     return 0
 }
 
@@ -370,7 +485,7 @@ join_worker_nodes() {
 deploy_stack() {
     print_status "Deploying fine-tuning stack..."
     
-    # Check if required files exist
+    # Check if required files exist locally
     local compose_file="$PWD/docker-compose.yml"
     local entrypoint_file="$PWD/pytorch-ft-entrypoint.sh"
     
@@ -384,13 +499,13 @@ deploy_stack() {
         return 1
     fi
     
-    # Make entrypoint executable
+    # Make entrypoint executable locally
     chmod +x "$entrypoint_file"
     
-    # Deploy stack
-    print_status "Deploying fine-tuning multi-node stack..."
-    if docker stack deploy -c "$compose_file" finetuning-multinode; then
-        print_status "Fine-tuning stack deployed successfully"
+    # Deploy stack on manager node
+    print_status "Deploying fine-tuning multi-node stack on manager node..."
+    if ssh_execute "$MANAGER_HOSTNAME" "cd $(dirname "$compose_file") && chmod +x $entrypoint_file && docker stack deploy -c $compose_file finetuning-multinode"; then
+        print_status "Fine-tuning stack deployed successfully on manager node"
         log "Fine-tuning stack deployed"
         return 0
     else
@@ -403,12 +518,12 @@ deploy_stack() {
 find_container_id() {
     print_status "Finding Docker container ID..."
     
-    # Get container ID
+    # Get container ID from manager node
     local container_id
-    container_id=$(docker ps -q -f name=finetuning-multinode)
+    container_id=$(ssh_execute "$MANAGER_HOSTNAME" "docker ps -q -f name=finetuning-multinode")
     
     if [[ -z "$container_id" ]]; then
-        print_warning "No running finetuning-multinode containers found"
+        print_warning "No running finetuning-multinode containers found on manager node"
         return 1
     fi
     
@@ -422,12 +537,7 @@ find_container_id() {
 adapt_config_files() {
     print_status "Adapting configuration files..."
     
-    # This is a complex step requiring:
-    # 1. Setting machine_rank for each node
-    # 2. Setting main_process_ip from manager node
-    # 3. Setting main_process_port
-    
-    # Check if we have configuration files
+    # Check if we have configuration files locally
     local config_files=("$PWD/config_finetuning.yaml" "$PWD/config_fsdp_lora.yaml")
     local found_configs=false
     
@@ -439,29 +549,61 @@ adapt_config_files() {
     done
     
     if [[ "$found_configs" == false ]]; then
-        print_warning "No configuration files found. You need to download them first."
+        print_warning "No configuration files found locally. You need to download them first."
         return 1
     fi
     
     # Get manager IP
     local manager_ip=""
-    if [[ -n "${MANAGER_HOSTNAME:-}" ]]; then
-        manager_ip=$(ping -c 1 -W 5 "${MANAGER_HOSTNAME}.local" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-        if [[ -z "$manager_ip" ]]; then
-            print_warning "Could not resolve manager hostname. Please set main_process_ip manually."
-        fi
+    manager_ip=$(ssh_execute "$MANAGER_HOSTNAME" "hostname -I | awk '{print \$1}'")
+    
+    if [[ -z "$manager_ip" ]]; then
+        print_warning "Could not determine manager IP address. Please set main_process_ip manually."
+        return 1
     fi
     
     print_status "Manager IP: $manager_ip"
     
-    print_warning "Configuration file adaptation requires manual editing."
-    print_warning "Please edit the following files to set:"
-    print_warning "  - machine_rank (0 for manager, 1 for worker, etc.)"
-    print_warning "  - main_process_ip (manager node IP)"
-    print_warning "  - main_process_port (a free port on manager node)"
+    # Set default port
+    local port=29500
     
-    # Ask user to confirm
-    read -rp "Press Enter after adapting configuration files..."
+    # Adapt each config file
+    for config_file in "${config_files[@]}"; do
+        if [[ -f "$config_file" ]]; then
+            print_status "Adapting $config_file..."
+            
+            # Determine machine rank based on hostname
+            local machine_rank=0  # Manager node is rank 0
+            
+            # If we're not on manager node, determine rank based on hostname
+            if [[ "$HOSTNAME" != "$MANAGER_HOSTNAME" ]]; then
+                # If we have a list of workers, check if current node is one of them
+                IFS=',' read -ra WORKERS <<< "$WORKER_HOSTNAMES"
+                for i in "${!WORKERS[@]}"; do
+                    if [[ "$HOSTNAME" == "${WORKERS[i]}" ]]; then
+                        machine_rank=$((i + 1))
+                        break
+                    fi
+                done
+            fi
+            
+            print_status "Setting machine_rank: $machine_rank"
+            print_status "Setting main_process_ip: $manager_ip"
+            print_status "Setting main_process_port: $port"
+            
+            # Create backup
+            cp "$config_file" "${config_file}.backup"
+            
+            # Update config file
+            sed -i "s/machine_rank: .*/machine_rank: $machine_rank/" "$config_file"
+            sed -i "s/main_process_ip: .*/main_process_ip: $manager_ip/" "$config_file"
+            sed -i "s/main_process_port: .*/main_process_port: $port/" "$config_file"
+            
+            print_status "Configuration file $config_file adapted successfully"
+        fi
+    done
+    
+    print_status "All configuration files adapted"
     return 0
 }
 
@@ -471,7 +613,7 @@ run_finetune() {
     
     # Check if container ID exists
     local container_id
-    container_id=$(docker ps -q -f name=finetuning-multinode)
+    container_id=$(ssh_execute "$MANAGER_HOSTNAME" "docker ps -q -f name=finetuning-multinode")
     
     if [[ -z "$container_id" ]]; then
         print_error "No running container found. Please run 'find_container_id' first."
@@ -484,18 +626,42 @@ run_finetune() {
         return 1
     fi
     
+    # Check which script to run
+    print_status "Selecting fine-tuning script..."
+    local script_to_run=""
+    local config_file=""
+    
+    if [[ -f "$PWD/config_fsdp_lora.yaml" ]]; then
+        script_to_run="/workspace/Llama3_70B_LoRA_finetuning.py"
+        config_file="/workspace/configs/config_fsdp_lora.yaml"
+        print_status "Using FSDP LoRA configuration for 70B model"
+    elif [[ -f "$PWD/config_finetuning.yaml" ]]; then
+        script_to_run="/workspace/Llama3_3B_finetuning.py"
+        config_file="/workspace/configs/config_finetuning.yaml"
+        print_status "Using full fine-tuning configuration for 3B model"
+    else
+        print_warning "No known configuration file found. Please ensure your scripts are in the container."
+        script_to_run="/workspace/Llama3_70B_LoRA_finetuning.py"
+        config_file="/workspace/configs/config_fsdp_lora.yaml"
+    fi
+    
     # Run the fine-tuning command
     print_status "Running fine-tuning script with container: $container_id"
-    print_status "Make sure you have the required scripts in your container"
+    print_status "Using script: $script_to_run"
+    print_status "Using config: $config_file"
     
-    # This command would be run inside the container to execute the fine-tuning
-    print_warning "The actual fine-tuning command would be something like:"
-    print_warning "  docker exec -e HF_TOKEN=$HF_TOKEN -it $container_id bash -c 'bash /workspace/install-requirements; accelerate launch --config_file=/workspace/configs/config_fsdp_lora.yaml /workspace/Llama3_70B_LoRA_finetuning.py'"
+    # Execute the command in the container
+    local fine_tune_cmd="docker exec -e HF_TOKEN=$HF_TOKEN -it $container_id bash -c 'bash /workspace/install-requirements && accelerate launch --config_file=$config_file $script_to_run'"
     
-    print_warning "Please execute your fine-tuning command manually with the appropriate parameters."
+    print_status "Executing fine-tuning command..."
+    print_status "This will run in the background. Monitor the logs on the manager node."
     
-    # Ask user to confirm
-    read -rp "Press Enter after running the fine-tuning script..."
+    # Run in background to avoid hanging
+    ssh_execute "$MANAGER_HOSTNAME" "$fine_tune_cmd" &
+    
+    print_status "Fine-tuning started in background. Check container logs for progress."
+    print_status "You can monitor the process using: docker logs -f <container_id>"
+    
     return 0
 }
 
@@ -503,12 +669,12 @@ run_finetune() {
 cleanup() {
     print_status "Cleaning up and rolling back..."
     
-    # Remove containers
-    print_status "Removing fine-tuning stack..."
-    if docker stack rm finetuning-multinode; then
-        print_status "Fine-tuning stack removed"
+    # Remove containers from manager node
+    print_status "Removing fine-tuning stack from manager node..."
+    if ssh_execute "$MANAGER_HOSTNAME" "docker stack rm finetuning-multinode"; then
+        print_status "Fine-tuning stack removed from manager node"
     else
-        print_warning "Failed to remove fine-tuning stack"
+        print_warning "Failed to remove fine-tuning stack from manager node"
     fi
     
     # Remove downloaded models
@@ -614,6 +780,7 @@ main() {
             ;;
         network)
             verify_requirements
+            gather_config
             configure_network
             ;;
         docker)
@@ -622,22 +789,27 @@ main() {
             ;;
         resources)
             verify_requirements
+            gather_config
             enable_resource_advertising
             ;;
         swarm)
             verify_requirements
+            gather_config
             initialize_swarm
             ;;
         join)
             verify_requirements
+            gather_config
             join_worker_nodes
             ;;
         deploy)
             verify_requirements
+            gather_config
             deploy_stack
             ;;
         finetune)
             verify_requirements
+            gather_config
             find_container_id
             adapt_config_files
             run_finetune
