@@ -80,5 +80,5 @@
             "version": "24"
         }
     },
-    "postCreateCommand": "cd /workspaces/dgx-spark-it-up && if [ ! -d \"bats-core\" ]; then git clone https://github.com/bats-core/bats-core.git && cd bats-core && ./install.sh /usr/local; else echo \"bats-core already exists, skipping clone\"; fi"
+    "postCreateCommand": "echo 'Bats is already installed at /usr/local/bin/bats'"
 }
