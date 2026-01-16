@@ -1,0 +1,75 @@
+{
+    "name": "Developer Container",
+    "image": "mcr.microsoft.com/devcontainers/go:1.24-bookworm",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go",
+                "ms-vscode.vscode-typescript-next",
+                "dbaeumer.vscode-eslint",
+                "christian-kohler.npm-intellisense",
+                "ms-azuretools.vscode-docker",
+                "ms-vscode.makefile-tools",
+                "golang.vscode-go",
+                "ms-vscode-remote.remote-containers",
+                "saoudrizwan.claude-dev",
+                "ms-vscode-remote.remote-ssh",
+                "ms-vscode-remote.remote-ssh-edit",
+                "ms-vscode.remote-server",
+                "ms-vscode-remote.vscode-remote-extensionpack",
+                "ms-vscode.remote-explorer",
+                "ms-vscode.remote-repositories",
+                "ms-vscode-remote.remote-wsl",
+                "ms-dotnettools.vscode-dotnet-runtime",
+                "ms-dotnettools.csharp",
+                "ms-azuretools.vscode-containers",
+                "Dart-Code.dart-code",
+                "vscjava.vscode-java-debug",
+                "vscjava.vscode-java-pack",
+                "github.vscode-github-actions",
+                "GitHub.vscode-pull-request-github",
+                "vscjava.vscode-gradle",
+                "hashicorp.terraform",
+                "ms-toolsai.jupyter",
+                "ms-toolsai.vscode-jupyter-cell-tags",
+                "ms-toolsai.jupyter-renderers",
+                "ms-toolsai.vscode-jupyter-slideshow",
+                "redhat.java",
+                "vscjava.vscode-maven",
+                "ParallelsDesktop.parallels-desktop",
+                "bmewburn.vscode-intelephense-client",
+                "ms-python.vscode-pylance",
+                "ms-python.python",
+                "ms-python.debugpy",
+                "ms-python.vscode-python-envs",
+                "Shopify.ruby-lsp",
+                "rust-lang.rust-analyzer",
+                "vscjava.vscode-java-test",
+                "Vue.volar",
+                "redhat.vscode-yaml",
+                "DavidAnson.vscode-markdownlint",
+                "ms-windows-ai-studio.windows-ai-studio",
+                "ms-kubernetes-tools.vscode-kubernetes-tools",
+                "mechatroner.rainbow-csv",
+                "firefox-devtools.vscode-firefox-debug",
+                "ms-vscode.azure-repos",
+                "bierner.markdown-mermaid",
+                "ecmel.vscode-html-css",
+                "jay-youngn.vscode-proto3-next"
+            ]
+        }
+    },
+    "mounts": [],
+    "remoteEnv": {
+        "NPM_CONFIG_REGISTRY": "https://registry.npmjs.org/",
+        "GO111MODULE": "on"
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/go:1": {
+            "version": "1.24"
+        },
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "24"
+        }
+    }
+}
