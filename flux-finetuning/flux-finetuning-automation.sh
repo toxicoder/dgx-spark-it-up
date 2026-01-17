@@ -125,19 +125,39 @@ setup_directories() {
     mkdir -p flux-finetuning/assets/models/vae
 }
 
-# Check for HF_TOKEN.
+# Check for API keys.
 #
-# Verify that the Hugging Face token environment variable is set.
+# Verify that required API keys are available from configuration.
 #
 # Returns:
-#   0 - HF_TOKEN environment variable is set.
-#   1 - HF_TOKEN environment variable is not set.
-#
-# Errors:
-#   HF_TOKEN environment variable is not set: Hugging Face token required for model downloads.
-check_hf_token() {
-    if [[ -z "$HF_TOKEN" ]]; then
-        error "HF_TOKEN environment variable is not set. Please set it before running this script."
+#   0 - API keys are available.
+#   1 - API keys are not available.
+check_api_keys() {
+    # Source the central configuration to get API keys
+    if [[ -f "$HOME/config/export_ports.sh" ]]; then
+        source "$HOME/config/export_ports.sh"
+    elif [[ -f "/workspaces/dgx-spark-it-up/config/export_ports.sh" ]]; then
+        source "/workspaces/dgx-spark-it-up/config/export_ports.sh"
+    fi
+    
+    # Check if HF_TOKEN is available (from config or environment)
+    if [[ -z "$hf_token" ]]; then
+        if [[ -z "$HF_TOKEN" ]]; then
+            error "HF_TOKEN environment variable is not set. Please set it before running this script."
+        fi
+    else
+        # Use the configured HF_TOKEN
+        export HF_TOKEN="$hf_token"
+    fi
+    
+    # Check if NVIDIA API key is available (from config or environment)
+    if [[ -z "$nvidia_api_key" ]]; then
+        if [[ -z "$NGC_API_KEY" ]]; then
+            warn "NGC_API_KEY environment variable not set. Some features may be limited."
+        fi
+    else
+        # Use the configured NVIDIA API key
+        export NGC_API_KEY="$nvidia_api_key"
     fi
 }
 
@@ -254,7 +274,7 @@ main() {
     # Setup
     setup_directories
     clone_repository
-    check_hf_token
+    check_api_keys
     
     # Download model
     download_model

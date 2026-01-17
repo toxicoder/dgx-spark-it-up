@@ -146,12 +146,22 @@ create_docker_network() {
 authenticate_nvc() {
     log "Step 6: Authenticating with NVIDIA Container Registry"
     
-    if [ -z "$NGC_API_KEY" ]; then
+    # Source the central configuration to get API keys
+    if [[ -f "$HOME/config/export_ports.sh" ]]; then
+        source "$HOME/config/export_ports.sh"
+    elif [[ -f "/workspaces/dgx-spark-it-up/config/export_ports.sh" ]]; then
+        source "/workspaces/dgx-spark-it-up/config/export_ports.sh"
+    fi
+    
+    # Use configured NGC_API_KEY if available, otherwise fall back to environment variable
+    local ngc_key="${nvidia_api_key:-$NGC_API_KEY}"
+    
+    if [ -z "$ngc_key" ]; then
         error "NGC_API_KEY environment variable not set"
     fi
     
     echo "Logging in to NVIDIA Container Registry..."
-    echo "$NGC_API_KEY" | docker login nvcr.io -u '$oauthtoken' --password-stdin || error "Failed to authenticate with NVIDIA Container Registry"
+    echo "$ngc_key" | docker login nvcr.io -u '$oauthtoken' --password-stdin || error "Failed to authenticate with NVIDIA Container Registry"
     
     log "Authentication completed"
 }

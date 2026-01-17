@@ -89,11 +89,18 @@ enable_remote_access() {
         return
     fi
     
+    # Source the central configuration
+    if [[ -f "$HOME/config/export_ports.sh" ]]; then
+        source "$HOME/config/export_ports.sh"
+    elif [[ -f "/workspaces/dgx-spark-it-up/config/export_ports.sh" ]]; then
+        source "/workspaces/dgx-spark-it-up/config/export_ports.sh"
+    fi
+    
     # Create systemd override file
     sudo mkdir -p /etc/systemd/system/ollama.service.d
     sudo tee /etc/systemd/system/ollama.service.d/override.conf << EOF
 [Service]
-Environment="OLLAMA_HOST=0.0.0.0:11434"
+Environment="OLLAMA_HOST=0.0.0.0:$ollama"
 Environment="OLLAMA_ORIGINS=*"
 EOF
     
