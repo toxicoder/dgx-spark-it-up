@@ -1,32 +1,73 @@
 #!/bin/bash
 
-# ComfyUI Automation Script
-# This script automates the installation and setup of ComfyUI on NVIDIA DGX Spark devices
+# ComfyUI Automation Script.
+#
+# This script automates the installation and setup of ComfyUI on NVIDIA DGX Spark devices, including dependency installation, model downloading, and server launching.
 
 set -e  # Exit on any error
 
 # Colors for output
+# RED color code for error messages
 RED='\033[0;31m'
+# GREEN color code for info messages
 GREEN='\033[0;32m'
+# YELLOW color code for warning messages
 YELLOW='\033[1;33m'
+# NC color code for no color (reset)
 NC='\033[0m' # No Color
 
-# Log function
+# Log function - Print an info message with green color prefix.
+#
+# Prints an info message with a green color prefix for clear visual distinction.
+#
+# Parameters:
+#   $1 (String) - Message to log.
+#
+# Returns:
+#   0 - Success.
 log() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-# Error function
+# Error function - Print an error message with red color prefix.
+#
+# Prints an error message with a red color prefix for clear visual distinction.
+#
+# Parameters:
+#   $1 (String) - Error message to log.
+#
+# Returns:
+#   0 - Success.
 error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Warning function
+# Warning function - Print a warning message with yellow color prefix.
+#
+# Prints a warning message with a yellow color prefix for clear visual distinction.
+#
+# Parameters:
+#   $1 (String) - Warning message to log.
+#
+# Returns:
+#   0 - Success.
 warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Function to check prerequisites
+# check_prerequisites - Verify system prerequisites for ComfyUI installation.
+#
+# Verifies that all system prerequisites are met for ComfyUI installation,
+# including Python 3, pip3, and nvidia-smi availability.
+#
+# Returns:
+#   0 - All prerequisites met.
+#   1 - Missing prerequisite detected.
+#
+# Errors:
+#   1 - Python 3 not installed. Python 3 is required for ComfyUI.
+#   1 - pip3 not installed. pip3 is required for package installation.
+#   1 - nvidia-smi not installed. nvidia-smi is required to detect GPU.
 check_prerequisites() {
     log "Step 1: Verifying system prerequisites"
     
@@ -62,7 +103,17 @@ check_prerequisites() {
     return 0
 }
 
-# Function to create virtual environment
+# create_virtual_env - Create Python virtual environment for ComfyUI dependencies.
+#
+# Creates a Python virtual environment for ComfyUI dependencies and activates it.
+#
+# Returns:
+#   0 - Virtual environment created/activated successfully.
+#   1 - Failed to create or activate virtual environment.
+#
+# Errors:
+#   1 - Failed to create virtual environment. Virtual environment creation failed.
+#   1 - Failed to activate virtual environment. Virtual environment activation failed.
 create_virtual_env() {
     log "Step 2: Creating Python virtual environment"
     
@@ -89,7 +140,16 @@ create_virtual_env() {
     return 0
 }
 
-# Function to install PyTorch with CUDA support
+# install_pytorch - Install PyTorch with CUDA 13.0 support.
+#
+# Installs PyTorch with CUDA 13.0 support in the virtual environment.
+#
+# Returns:
+#   0 - PyTorch installed successfully.
+#   1 - Failed to install PyTorch.
+#
+# Errors:
+#   1 - Failed to install PyTorch. PyTorch installation failed.
 install_pytorch() {
     log "Step 3: Installing PyTorch with CUDA 13.0 support"
     
@@ -104,7 +164,16 @@ install_pytorch() {
     return 0
 }
 
-# Function to clone ComfyUI repository
+# clone_comfyui - Clone ComfyUI repository from GitHub.
+#
+# Clones the ComfyUI repository from GitHub to the local directory.
+#
+# Returns:
+#   0 - Repository cloned successfully or already exists.
+#   1 - Failed to clone repository.
+#
+# Errors:
+#   1 - Failed to clone repository. Repository cloning failed.
 clone_comfyui() {
     log "Step 4: Cloning ComfyUI repository"
     
@@ -124,7 +193,17 @@ clone_comfyui() {
     return 0
 }
 
-# Function to install ComfyUI dependencies
+# install_dependencies - Install ComfyUI dependencies from requirements.txt.
+#
+# Installs all ComfyUI dependencies from requirements.txt.
+#
+# Returns:
+#   0 - Dependencies installed successfully.
+#   1 - Failed to install dependencies or requirements.txt not found.
+#
+# Errors:
+#   1 - requirements.txt not found. Dependencies file not found.
+#   1 - Failed to install dependencies. Dependency installation failed.
 install_dependencies() {
     log "Step 5: Installing ComfyUI dependencies"
     
@@ -143,7 +222,16 @@ install_dependencies() {
     return 0
 }
 
-# Function to download Stable Diffusion checkpoint
+# download_model - Download Stable Diffusion v1.5 checkpoint model.
+#
+# Downloads the Stable Diffusion v1.5 checkpoint model from Hugging Face.
+#
+# Returns:
+#   0 - Model downloaded successfully or already exists.
+#   1 - Failed to download model.
+#
+# Errors:
+#   1 - Failed to download model. Model download failed.
 download_model() {
     log "Step 6: Downloading Stable Diffusion checkpoint"
     
@@ -167,7 +255,16 @@ download_model() {
     return 0
 }
 
-# Function to launch ComfyUI server
+# launch_server - Launch ComfyUI server in the background.
+#
+# Launches the ComfyUI server in the background and validates it's running.
+#
+# Returns:
+#   0 - Server launched successfully.
+#   1 - Failed to launch server.
+#
+# Errors:
+#   1 - ComfyUI server failed to start. Server process could not be started.
 launch_server() {
     log "Step 7: Launching ComfyUI server"
     
@@ -189,7 +286,16 @@ launch_server() {
     return 0
 }
 
-# Function to validate installation
+# validate_installation - Validate ComfyUI server is responding correctly.
+#
+# Validates that ComfyUI server is responding correctly on port 8188.
+#
+# Returns:
+#   0 - Installation validated successfully.
+#   1 - Installation validation failed.
+#
+# Errors:
+#   1 - ComfyUI server is not responding on port 8188. Server not responding.
 validate_installation() {
     log "Step 8: Validating installation"
     
@@ -203,7 +309,12 @@ validate_installation() {
     return 0
 }
 
-# Function to cleanup installation
+# cleanup - Remove temporary files and directories.
+#
+# Removes all temporary files and directories created during ComfyUI installation.
+#
+# Returns:
+#   0 - Cleanup completed successfully.
 cleanup() {
     log "Step 9: Cleaning up installation"
     
@@ -227,7 +338,12 @@ cleanup() {
     return 0
 }
 
-# Function to show next steps
+# show_next_steps - Display instructions for using installed ComfyUI.
+#
+# Displays instructions for using the installed ComfyUI, including web interface access.
+#
+# Returns:
+#   0 - Success.
 show_next_steps() {
     log "Step 10: Next steps"
     echo "To test the installation:"
@@ -238,7 +354,17 @@ show_next_steps() {
     echo "The image generation should complete within 30-60 seconds depending on your hardware configuration."
 }
 
-# Main execution function
+# main - Execute the main installation workflow for ComfyUI.
+#
+# Executes the main installation workflow for ComfyUI, including all steps from
+# prerequisites checking to final validation.
+#
+# Parameters:
+#   $@ (All) - All arguments passed to the script.
+#
+# Returns:
+#   0 - Installation completed successfully.
+#   1 - Installation failed at some step.
 main() {
     log "Starting ComfyUI automation installation"
     
@@ -273,7 +399,12 @@ main() {
     return 0
 }
 
-# Cleanup function to be called on exit
+# cleanup_on_exit - Perform cleanup when script exits.
+#
+# Performs cleanup operations when the script exits, including killing background processes.
+#
+# Returns:
+#   0 - Cleanup completed.
 cleanup_on_exit() {
     log "Cleaning up on exit..."
     cleanup

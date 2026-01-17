@@ -1,29 +1,60 @@
 #!/bin/bash
 
-# Isaac Lab Automation Script
-# This script automates the installation and setup of Isaac Lab according to the NVIDIA guide
+# Isaac Lab Automation Script.
+#
+# This script automates the installation and setup of Isaac Lab according to the NVIDIA guide, including repository cloning, symbolic link creation, and training execution.
 
 set -e  # Exit on any error
 
-# Function to log messages
+# log - Log informational messages.
+#
+# Logs informational messages to stdout with [INFO] prefix.
+#
+# Parameters:
+#   $1 (String) - Message to log.
+#
+# Returns:
+#   0 - Success.
 log() {
     echo "[INFO] $1"
 }
 
-# Function to log errors
+# error - Log error messages and exit.
+#
+# Logs error messages to stderr with [ERROR] prefix and exits with code 1.
+#
+# Parameters:
+#   $1 (String) - Error message to log.
+#
+# Returns:
+#   1 - Error occurred.
 error() {
     echo "[ERROR] $1" >&2
     exit 1
 }
 
-# Function to check if command succeeded
+# check_command - Check if last command succeeded.
+#
+# Checks if the last executed command returned exit code 0.
+#
+# Parameters:
+#   $1 (String) - Error message to display if command failed.
+#
+# Returns:
+#   0 - Command succeeded.
 check_command() {
     if [ $? -ne 0 ]; then
         error "$1"
     fi
 }
 
-# Step 1: Install Isaac Sim (Assumed to be done already)
+# install_isaac_sim - Check Isaac Sim installation.
+#
+# Checks if Isaac Sim is installed and the ISAACSIM_PATH environment variable is set correctly.
+#
+# Returns:
+#   0 - Isaac Sim installation verified.
+#   1 - Installation or path verification failed.
 install_isaac_sim() {
     log "Step 1: Checking Isaac Sim installation..."
     
@@ -42,7 +73,12 @@ install_isaac_sim() {
     log "Isaac Sim installation found at: $ISAACSIM_PATH"
 }
 
-# Step 2: Clone the Isaac Lab repository
+# clone_isaac_lab_repo - Clone Isaac Lab repository.
+#
+# Clones the Isaac Lab repository from GitHub if it doesn't already exist.
+#
+# Returns:
+#   0 - Repository cloned or already exists.
 clone_isaac_lab_repo() {
     log "Step 2: Cloning Isaac Lab repository..."
     
@@ -56,7 +92,13 @@ clone_isaac_lab_repo() {
     cd IsaacLab
 }
 
-# Step 3: Create symbolic link to Isaac Sim installation
+# setup_isaac_sim_link - Create symbolic link to Isaac Sim.
+#
+# Creates a symbolic link to the Isaac Sim installation directory.
+#
+# Returns:
+#   0 - Symbolic link created successfully.
+#   1 - Failed to create symbolic link.
 setup_isaac_sim_link() {
     log "Step 3: Creating symbolic link to Isaac Sim installation..."
     
@@ -86,7 +128,13 @@ setup_isaac_sim_link() {
     log "Symbolic link created successfully: ${PWD}/_isaac_sim -> ${ISAACSIM_PATH}"
 }
 
-# Step 4: Install Isaac Lab
+# install_isaac_lab - Install Isaac Lab.
+#
+# Installs Isaac Lab by running the installation script.
+#
+# Returns:
+#   0 - Installation completed successfully.
+#   1 - Installation failed.
 install_isaac_lab() {
     log "Step 4: Installing Isaac Lab..."
     
@@ -99,7 +147,13 @@ install_isaac_lab() {
     log "Isaac Lab installed successfully"
 }
 
-# Step 5: Run Isaac Lab training
+# run_isaac_lab_training - Run Isaac Lab training in headless mode.
+#
+# Runs Isaac Lab training in headless mode with specified task.
+#
+# Returns:
+#   0 - Training completed successfully.
+#   1 - Training failed.
 run_isaac_lab_training() {
     log "Step 5: Running Isaac Lab training..."
     
@@ -113,7 +167,13 @@ run_isaac_lab_training() {
     log "Isaac Lab training completed successfully in headless mode"
 }
 
-# Step 5b: Run Isaac Lab training with visualization (additional option)
+# run_isaac_lab_training_visualization - Run Isaac Lab training with visualization.
+#
+# Runs Isaac Lab training with visualization enabled.
+#
+# Returns:
+#   0 - Training completed successfully.
+#   1 - Training failed.
 run_isaac_lab_training_visualization() {
     log "Step 5b: Running Isaac Lab training with visualization..."
     
@@ -127,7 +187,16 @@ run_isaac_lab_training_visualization() {
     log "Isaac Lab training completed successfully with visualization"
 }
 
-# Main execution function
+# main - Main execution function.
+#
+# Main execution function that orchestrates the complete Isaac Lab setup process.
+#
+# Parameters:
+#   $@ (All) - Command line arguments.
+#
+# Returns:
+#   0 - Script completed successfully.
+#   1 - Script failed at some point.
 main() {
     log "Starting Isaac Lab automation..."
     

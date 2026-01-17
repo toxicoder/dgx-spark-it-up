@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package port_config;
+
+message PortConfig {
+    int32 ollama = 1; // default 11434
+    int32 arangodb = 2; // default 8529
+    int32 qdrant_http = 3; // default 6333
+    int32 qdrant_grpc = 4; // default 6334
+    int32 app_host = 5; // default 3001 (host port for container)
+    int32 sentence_transformers = 6; // default 8000
+    int32 open_webui = 7; // default 12000
+    int32 milvus = 8; // default 19530
+    int32 vllm = 9; // default 8001
+}
+
+message ApiKeys {
+    string nvidia_api_key = 1;
+    string hf_token = 2;
+}
+
+message GlobalConfig {
+    PortConfig ports = 1;
+    ApiKeys keys = 2;
+}

@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
-# =============================================================================
-# NVIDIA DGX Spark PyTorch Fine-Tuning Automation Script
-# This script automates the PyTorch fine-tuning process on DGX Spark nodes
-# following the official guide at https://build.nvidia.com/spark/pytorch-fine-tune
-# =============================================================================
+# NVIDIA DGX Spark PyTorch Fine-Tuning Automation Script.
+#
+# This script automates the PyTorch fine-tuning process on DGX Spark nodes, including system verification, network configuration, Docker setup, resource advertising, swarm initialization, worker node joining, stack deployment, and fine-tuning execution.
 
 # Bash strict mode
 set -euo pipefail

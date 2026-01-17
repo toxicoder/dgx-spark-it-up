@@ -1,0 +1,34 @@
+# Global Port Configuration
+# Generated from analysis of existing configurations
+
+# Ollama configuration
+ollama: 11434
+
+# ArangoDB configuration
+arangodb: 18529
+
+# Qdrant configuration
+qdrant_http: 16333
+qdrant_grpc: 16334
+
+# App service configuration
+app_host: 13001
+
+# Sentence Transformers configuration
+sentence_transformers: 18000
+
+# Open WebUI configuration
+open_webui: 12000
+
+# Milvus configuration
+milvus: 19530
+
+# vLLM configuration
+vllm: 18001
+
+# API Keys (empty by default - should be set in environment)
+# Note: These should be set in your environment variables or .env file
+# For security, never commit API keys to version control
+nvidia_api_key: ""  # Set via NVIDIA_API_KEY environment variable
+
+hf_token: ""  # Set via HF_TOKEN environment variable

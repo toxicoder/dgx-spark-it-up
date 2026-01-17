@@ -89,12 +89,20 @@ echo ""
 echo "=== Setup Complete ==="
 echo "txt2kg is now running!"
 echo ""
-echo "Access the web interface at: http://localhost:3001"
-echo "ArangoDB Web Interface: http://localhost:8529"
-echo "Ollama API: http://localhost:11434"
+
+# Source the central configuration to get actual ports
+if [[ -f "$HOME/config/export_ports.sh" ]]; then
+    source "$HOME/config/export_ports.sh"
+elif [[ -f "/workspaces/dgx-spark-it-up/config/export_ports.sh" ]]; then
+    source "/workspaces/dgx-spark-it-up/config/export_ports.sh"
+fi
+
+echo "Access the web interface at: http://localhost:${app_host}"
+echo "ArangoDB Web Interface: http://localhost:${arangodb}"
+echo "Ollama API: http://localhost:${ollama}"
 echo ""
 echo "Next steps:"
-echo "1. Open http://localhost:3001 in your browser"
+echo "1. Open http://localhost:${app_host} in your browser"
 echo "2. Upload documents and start building your knowledge graph!"
 echo "3. To stop services, run: ./stop.sh"
 echo ""
