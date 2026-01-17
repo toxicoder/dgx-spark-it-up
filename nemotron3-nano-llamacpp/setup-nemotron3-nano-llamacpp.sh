@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# Automated setup script for Nemotron-3-Nano-30B-A3B GGUF model on DGX Spark
-# This script automates all steps from the installation guide
+# Nemotron-3-Nano-30B-A3B GGUF Setup Script.
+#
+# This script automates the complete setup of Nemotron-3-Nano-30B-A3B GGUF model on DGX Spark, including prerequisites checking, virtual environment setup, llama.cpp building, model downloading, and server startup.
 
 set -euo pipefail
 
@@ -11,22 +12,51 @@ readonly VENV_DIR="./nemotron-venv"
 readonly LLAMA_CPP_DIR="./llama.cpp"
 readonly SERVER_LOG="server.log"
 
-# Function to print styled messages
+# print_header – Print styled header message.
+#
+# Prints a formatted header message for the Nemotron setup script.
+#
+# Returns:
+#   0 – Success. .
 print_header() {
     echo "==============================================="
     echo "Nemotron-3-Nano-30B-A3B Setup Script"
     echo "==============================================="
 }
 
+# print_status – Print status message.
+#
+# Prints a status message with a checkmark emoji prefix.
+#
+# Parameters:
+#   $1 (String) – Status message to display. .
+#
+# Returns:
+#   0 – Success. .
 print_status() {
     echo "✅ $1"
 }
 
+# print_error – Print error message.
+#
+# Prints an error message with a cross emoji prefix to stderr.
+#
+# Parameters:
+#   $1 (String) – Error message to display. .
+#
+# Returns:
+#   0 – Success. .
 print_error() {
     echo "❌ $1" >&2
 }
 
-# Function to check prerequisites
+# check_prerequisites – Check system prerequisites.
+#
+# Checks that all required system tools (git, cmake, nvcc) are installed and available.
+#
+# Returns:
+#   0 – All prerequisites met. .
+#   1 – Missing prerequisite detected. .
 check_prerequisites() {
     print_status "Checking prerequisites..."
     
@@ -51,7 +81,13 @@ check_prerequisites() {
     print_status "Prerequisites verified."
 }
 
-# Function to setup virtual environment
+# setup_virtual_environment – Set up Hugging Face CLI virtual environment.
+#
+# Sets up a Python virtual environment and installs the Hugging Face CLI.
+#
+# Returns:
+#   0 – Virtual environment set up successfully. .
+#   1 – Failed to set up virtual environment. .
 setup_virtual_environment() {
     print_status "Setting up Hugging Face CLI environment..."
     
@@ -69,7 +105,13 @@ setup_virtual_environment() {
     hf --version
 }
 
-# Function to clone llama.cpp repository
+# clone_llama_cpp – Clone llama.cpp repository.
+#
+# Clones the llama.cpp repository from GitHub to the local directory.
+#
+# Returns:
+#   0 – Repository cloned successfully. .
+#   1 – Failed to clone repository. .
 clone_llama_cpp() {
     print_status "Cloning llama.cpp repository..."
     
@@ -84,7 +126,13 @@ clone_llama_cpp() {
     fi
 }
 
-# Function to build llama.cpp with CUDA support
+# build_llama_cpp – Build llama.cpp with CUDA support.
+#
+# Builds the llama.cpp project with CUDA support enabled for GPU acceleration.
+#
+# Returns:
+#   0 – Build completed successfully. .
+#   1 – Build failed. .
 build_llama_cpp() {
     print_status "Building llama.cpp with CUDA support..."
     
@@ -107,7 +155,13 @@ build_llama_cpp() {
     print_status "llama.cpp built successfully."
 }
 
-# Function to download Nemotron GGUF model
+# download_model – Download Nemotron GGUF model.
+#
+# Downloads the Nemotron-3-Nano-30B-A3B GGUF model (~38GB) from Hugging Face.
+#
+# Returns:
+#   0 – Model downloaded successfully. .
+#   1 – Model download failed. .
 download_model() {
     print_status "Downloading Nemotron GGUF model (~38GB)..."
     
@@ -127,7 +181,13 @@ download_model() {
     print_status "Model downloaded successfully."
 }
 
-# Function to start llama.cpp server
+# start_server – Start llama.cpp server.
+#
+# Starts the llama.cpp server in the background with specified configuration.
+#
+# Returns:
+#   0 – Server started successfully. .
+#   1 – Server failed to start. .
 start_server() {
     print_status "Starting llama.cpp server..."
     
@@ -170,7 +230,16 @@ start_server() {
     fi
 }
 
-# Main execution function
+# main – Main execution function.
+#
+# Main execution function that orchestrates the complete Nemotron setup process.
+#
+# Parameters:
+#   $@ (All) – Command line arguments. .
+#
+# Returns:
+#   0 – Script completed successfully. .
+#   1 – Script failed at some point. .
 main() {
     print_header
     
@@ -188,8 +257,13 @@ main() {
 # Execute main function
 main "$@"
 
-# Add a function to check if we're running in test mode
-# This is a helper function to make testing easier
+# test_mode – Check if running in test mode.
+#
+# Checks if the script is running in test mode by examining TEST_MODE environment variable.
+#
+# Returns:
+#   0 – Test mode is enabled. .
+#   1 – Test mode is disabled. .
 test_mode() {
     if [[ "${TEST_MODE:-false}" == "true" ]]; then
         echo "Running in test mode"

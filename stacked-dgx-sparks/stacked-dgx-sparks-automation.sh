@@ -1,10 +1,41 @@
 #!/usr/bin/env bash
 
-# =============================================================================
 # NVIDIA DGX Spark Stacked Multi-Node Automation Script
-# This script automates the complete stacked DGX Sparks setup process
-# Following the guide from: https://build.nvidia.com/spark/trt-llm/stacked-sparks
-# =============================================================================
+#
+# This script automates the complete stacked DGX Sparks setup process, including:
+# - Environment verification
+# - Network configuration
+# - Docker setup
+# - Container deployment
+# - Model downloading
+# - API server deployment
+#
+# Usage:
+#   ./stacked-dgx-sparks-automation.sh [OPTIONS]
+#
+# Options:
+#   -h, --help                    Show this help message
+#   -c, --configure               Configure connection settings
+#   -v, --verify                  Verify environment and prerequisites
+#   -s, --setup                   Setup multi-node stacked DGX Sparks environment
+#   -d, --deploy                  Deploy model and start server
+#   -t, --test                    Test the deployed model
+#   -r, --rollback                Cleanup and rollback environment
+#   -u, --username USER           Specify username (overrides config)
+#   -H, --hostname HOST           Specify hostname (overrides config)
+#   -n, --node NODE               Specify secondary node IP (for multi-node)
+#   -m, --model MODEL             Specify model to deploy (default: nvidia/Qwen3-235B-A22B-FP4)
+#   -p, --port PORT               Specify server port (default: 8355)
+#   -t, --tp-size TP_SIZE         Specify tensor parallelism size (default: 2)
+#   -k, --hf-token TOKEN          Specify Hugging Face token (required for model download)
+#
+# Examples:
+#   ./stacked-dgx-sparks-automation.sh --configure
+#   ./stacked-dgx-sparks-automation.sh --verify
+#   ./stacked-dgx-sparks-automation.sh --setup --node 169.254.35.62 --hf-token your-hf-token
+#   ./stacked-dgx-sparks-automation.sh --deploy --model meta-llama/Llama-3.1-70B --hf-token your-hf-token
+#   ./stacked-dgx-sparks-automation.sh --test
+#   ./stacked-dgx-sparks-automation.sh --rollback
 
 # Bash strict mode
 set -euo pipefail
@@ -23,24 +54,64 @@ readonly DEFAULT_MODEL="nvidia/Qwen3-235B-A22B-FP4"
 readonly DEFAULT_PORT="8355"
 readonly DEFAULT_TP_SIZE="2"
 
-# Print colored output
+# Print colored output.
+#
+# Prints a status message with a green color prefix.
+#
+# Args:
+#   $1: The status message to display
+#
+# Returns:
+#   None
 print_status() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
+# Print warning message
+#
+# Prints a warning message with a yellow color prefix.
+#
+# Args:
+#   $1: The warning message to display
+#
+# Returns:
+#   None
 print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+# Print error message
+#
+# Prints an error message with a red color prefix.
+#
+# Args:
+#   $1: The error message to display
+#
+# Returns:
+#   None
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1" >&2
 }
 
+# Print debug message
+#
+# Prints a debug message with a blue color prefix.
+#
+# Args:
+#   $1: The debug message to display
+#
+# Returns:
+#   None
 print_debug() {
     echo -e "${BLUE}[DEBUG]${NC} $1"
 }
 
 # Display usage information
+#
+# Displays the usage message and all available command line options.
+#
+# Returns:
+#   None
 usage() {
     echo "Usage: $SCRIPT_NAME [OPTIONS]"
     echo ""
@@ -71,6 +142,11 @@ usage() {
 }
 
 # Verify SSH client availability
+#
+# Verifies that the SSH client is installed and available in the PATH.
+#
+# Returns:
+#   0 if SSH client is available, 1 otherwise
 verify_ssh_client() {
     print_status "Verifying SSH client availability..."
     
@@ -86,6 +162,11 @@ verify_ssh_client() {
 }
 
 # Verify Docker client availability
+#
+# Verifies that the Docker client is installed and available in the PATH.
+#
+# Returns:
+#   0 if Docker client is available, 1 otherwise
 verify_docker_client() {
     print_status "Verifying Docker client availability..."
     
@@ -101,6 +182,11 @@ verify_docker_client() {
 }
 
 # Check Docker permissions
+#
+# Checks if the user has proper Docker permissions to run Docker commands.
+#
+# Returns:
+#   0 if Docker permissions are correct, 1 otherwise
 check_docker_permissions() {
     print_status "Checking Docker permissions..."
     
@@ -117,6 +203,12 @@ check_docker_permissions() {
 }
 
 # Gather connection information
+#
+# Gathers connection information from user input or configuration file.
+# Prompts user for DGX Spark username, hostname, and secondary node IP.
+#
+# Returns:
+#   0 on successful configuration gathering, 1 on failure
 gather_connection_info() {
     print_status "Gathering connection information..."
     
@@ -154,6 +246,14 @@ EOF
 }
 
 # Test mDNS resolution
+#
+# Tests if mDNS resolution works for the given hostname.
+#
+# Args:
+#   $1: The hostname to test (without .local suffix)
+#
+# Returns:
+#   0 if mDNS resolution succeeds, 1 otherwise
 test_mdns_resolution() {
     local hostname="$1"
     print_status "Testing mDNS resolution for $hostname.local..."
@@ -168,6 +268,16 @@ test_mdns_resolution() {
 }
 
 # Test SSH connection to a host
+#
+# Tests SSH connectivity to a remote host using either mDNS hostname or IP address.
+#
+# Args:
+#   $1: Username for SSH connection
+#   $2: Hostname (without .local suffix)
+#   $3: Optional IP address to use if mDNS fails
+#
+# Returns:
+#   0 if SSH connection succeeds, 1 otherwise
 test_ssh_connection() {
     local username="$1"
     local hostname="$2"
@@ -194,6 +304,16 @@ test_ssh_connection() {
 }
 
 # Verify remote connection
+#
+# Verifies connectivity to a remote host by executing a simple command.
+#
+# Args:
+#   $1: Username for SSH connection
+#   $2: Hostname (without .local suffix)
+#   $3: Optional IP address to use if mDNS fails
+#
+# Returns:
+#   0 if remote connection verification succeeds, 1 otherwise
 verify_remote_connection() {
     local username="$1"
     local hostname="$2"
@@ -226,6 +346,12 @@ verify_remote_connection() {
 }
 
 # Get network interface information
+#
+# Gets network interface information and prompts user for interface selection.
+# Determines the IP address for the selected interface.
+#
+# Returns:
+#   0 on successful interface information gathering, 1 on failure
 get_network_interfaces() {
     print_status "Getting network interface information..."
     
@@ -260,7 +386,78 @@ get_network_interfaces() {
     return 0
 }
 
+# Create and validate hostfile
+#
+# Creates and validates a hostfile with the specified network interface information.
+#
+# Args:
+#   $1: Path to the hostfile to create
+#   $2: Network interface name
+#   $3: Optional node information to add to the hostfile
+#
+# Returns:
+#   0 on successful hostfile creation, 1 on failure
+create_and_validate_hostfile() {
+    local hostfile_path="$1"
+    local network_interface="$2"
+    local node_info="$3"
+    
+    print_status "Creating and validating hostfile at $hostfile_path..."
+    
+    # Validate network interface exists
+    if ! ip link show "$network_interface" &> /dev/null; then
+        print_error "Network interface $network_interface does not exist"
+        return 1
+    fi
+    
+    # Get IP address for the interface
+    local ip_address
+    ip_address=$(ip addr show "$network_interface" | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1)
+    
+    if [[ -z "$ip_address" ]]; then
+        print_error "Could not determine IP address for interface $network_interface"
+        return 1
+    fi
+    
+    # Create the hostfile with primary node IP
+    print_status "Creating hostfile with IP address: $ip_address"
+    cat > "$hostfile_path" << EOF
+$ip_address
+EOF
+    
+    # If node_info is specified, add it too
+    if [[ -n "$node_info" ]]; then
+        print_status "Adding node information to hostfile: $node_info"
+        echo "$node_info" >> "$hostfile_path"
+    fi
+    
+    # Validate hostfile was created
+    if [[ ! -f "$hostfile_path" ]]; then
+        print_error "Failed to create hostfile at $hostfile_path"
+        return 1
+    fi
+    
+    # Validate hostfile content
+    local file_content
+    file_content=$(cat "$hostfile_path")
+    if [[ -z "$file_content" ]]; then
+        print_error "Hostfile at $hostfile_path is empty"
+        return 1
+    fi
+    
+    print_status "Hostfile created successfully at $hostfile_path"
+    print_status "Hostfile contents:"
+    cat "$hostfile_path"
+    
+    return 0
+}
+
 # Configure Docker permissions
+#
+# Checks Docker permissions and optionally configures them if needed.
+#
+# Returns:
+#   0 if Docker permissions are correct, 1 otherwise
 configure_docker_permissions() {
     print_status "Checking Docker permissions..."
     
@@ -286,6 +483,12 @@ configure_docker_permissions() {
 }
 
 # Create OpenMPI hostfile
+#
+# Creates an OpenMPI hostfile with the primary node IP address.
+# Optionally adds secondary node IP if specified.
+#
+# Returns:
+#   0 on successful hostfile creation, 1 on failure
 create_hostfile() {
     print_status "Creating OpenMPI hostfile..."
     
@@ -308,6 +511,11 @@ EOF
 }
 
 # Start containers on nodes
+#
+# Starts TRT-LLM containers on the primary node and optionally on secondary node.
+#
+# Returns:
+#   0 on successful container start, 1 on failure
 start_containers() {
     print_status "Starting TRT-LLM containers on all nodes..."
     
@@ -360,6 +568,11 @@ start_containers() {
 }
 
 # Verify containers are running
+#
+# Verifies that containers are running on the primary node.
+#
+# Returns:
+#   0 on successful verification, 1 on failure
 verify_containers() {
     print_status "Verifying containers are running..."
     
@@ -380,6 +593,11 @@ verify_containers() {
 }
 
 # Copy hostfile to primary container
+#
+# Copies the OpenMPI hostfile to the primary container.
+#
+# Returns:
+#   0 on successful copy, 1 on failure
 copy_hostfile_to_container() {
     print_status "Copying hostfile to primary container..."
     
@@ -400,6 +618,11 @@ copy_hostfile_to_container() {
 }
 
 # Save container reference
+#
+# Saves the container reference by setting an environment variable in the primary container.
+#
+# Returns:
+#   0 on successful save, 1 on failure
 save_container_reference() {
     print_status "Saving container reference..."
     
@@ -420,6 +643,11 @@ save_container_reference() {
 }
 
 # Generate configuration file
+#
+# Generates a configuration file inside the container for TensorRT-LLM API settings.
+#
+# Returns:
+#   0 on successful generation, 1 on failure
 generate_config_file() {
     print_status "Generating configuration file inside container..."
     
@@ -447,6 +675,11 @@ EOF'
 }
 
 # Download model
+#
+# Downloads the specified model inside the container using Hugging Face CLI.
+#
+# Returns:
+#   0 on successful download, 1 on failure
 download_model() {
     print_status "Downloading model inside container..."
     
@@ -476,6 +709,11 @@ download_model() {
 }
 
 # Serve the model
+#
+# Starts the TensorRT-LLM server with the specified model and configuration.
+#
+# Returns:
+#   0 on successful server start, 1 on failure
 serve_model() {
     print_status "Starting TensorRT-LLM server..."
     
@@ -515,6 +753,11 @@ serve_model() {
 }
 
 # Test API server
+#
+# Tests the deployed model server by making a curl request to the API endpoint.
+#
+# Returns:
+#   0 on successful test, 1 on failure
 test_api_server() {
     print_status "Testing the deployed model server..."
     
@@ -545,6 +788,12 @@ EOF
 }
 
 # Cleanup and rollback
+#
+# Cleans up the stacked DGX Sparks environment by stopping containers,
+# removing downloaded models, and cleaning up temporary files.
+#
+# Returns:
+#   0 on successful cleanup, 1 on failure
 cleanup() {
     print_status "Cleaning up stacked DGX Sparks environment..."
     
@@ -575,7 +824,15 @@ cleanup() {
     return 0
 }
 
-# Main function
+# Main function.
+#
+# Parses command line arguments and executes the appropriate action based on the specified command.
+#
+# Args:
+#   All command line arguments passed to the script
+#
+# Returns:
+#   None (exits with appropriate status codes)
 main() {
     local action=""
     local username=""

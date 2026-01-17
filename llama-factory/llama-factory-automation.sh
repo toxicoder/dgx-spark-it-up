@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# LLaMA Factory Automation Script
-# This script automates the entire LLaMA Factory workflow for fine-tuning LLMs
+# LLaMA Factory Automation Script.
+#
+# This script automates the entire LLaMA Factory workflow for fine-tuning LLMs, including system verification, container setup, repository cloning, dependency installation, training, and model export.
 
 set -euo pipefail  # Exit on any error, undefined vars, pipe failures
 

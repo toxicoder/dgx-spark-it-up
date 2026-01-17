@@ -6,26 +6,66 @@
 set -euo pipefail
 
 # Colors for output
+# RED color code for error messages
 RED='\033[0;31m'
+# GREEN color code for info messages
 GREEN='\033[0;32m'
+# YELLOW color code for warning messages
 YELLOW='\033[1;33m'
+# NC color code for no color (reset)
 NC='\033[0m' # No Color
 
-# Logging function
+# Logging function.
+#
+# Print an info message with green color prefix.
+#
+# Arguments:
+#   $1 - Message to log.
+#
+# Returns:
+#   0 - Success.
 log() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
+# Warning function.
+#
+# Print a warning message with yellow color prefix.
+#
+# Arguments:
+#   $1 - Warning message to log.
+#
+# Returns:
+#   0 - Success.
 warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
+# Error function.
+#
+# Print an error message with red color prefix and exit.
+#
+# Arguments:
+#   $1 - Error message to log.
+#
+# Returns:
+#   1 - Error occurred and script exits.
 error() {
     echo -e "${RED}[ERROR]${NC} $1"
     exit 1
 }
 
-# Check system prerequisites
+# Check system prerequisites.
+#
+# Verify that all system prerequisites are met for JAX on Spark.
+#
+# Returns:
+#   0 - All prerequisites met.
+#   1 - Missing prerequisite detected.
+#
+# Errors:
+#   nvidia-smi not found: NVIDIA drivers and CUDA required.
+#   Docker not found: Docker required for containerization.
 check_prerequisites() {
     log "Checking system prerequisites..."
     
@@ -55,7 +95,16 @@ check_prerequisites() {
     log "Prerequisites check completed successfully"
 }
 
-# Clone the playbook repository
+# Clone the playbook repository.
+#
+# Clone the dgx-spark-playbooks repository from GitHub if it doesn't exist locally.
+#
+# Returns:
+#   0 - Repository cloned or already exists.
+#   1 - Failed to clone repository.
+#
+# Errors:
+#   Failed to clone dgx-spark-playbooks repository: Repository cloning failed.
 clone_playbook() {
     log "Cloning dgx-spark-playbooks repository..."
     
@@ -66,7 +115,17 @@ clone_playbook() {
     fi
 }
 
-# Build the Docker image
+# Build the Docker image.
+#
+# Build the JAX Docker image for development environment.
+#
+# Returns:
+#   0 - Docker image built successfully.
+#   1 - Failed to build Docker image or assets directory not found.
+#
+# Errors:
+#   JAX assets directory not found: Assets directory required for Docker build.
+#   Failed to build Docker image: Docker build process failed.
 build_docker_image() {
     log "Building JAX Docker image..."
     
@@ -84,7 +143,17 @@ build_docker_image() {
     log "Docker image built successfully"
 }
 
-# Launch Docker container
+# Launch Docker container.
+#
+# Launch the JAX development environment in a Docker container with GPU support.
+#
+# Returns:
+#   0 - Docker container launched successfully.
+#   1 - Docker image not found or launch failed.
+#
+# Errors:
+#   Docker image jax-on-spark not found: Docker image needs to be built first.
+#   Docker container launch failed: Container startup failed.
 launch_docker_container() {
     log "Launching JAX development environment in Docker container..."
     
@@ -100,7 +169,19 @@ launch_docker_container() {
         jax-on-spark
 }
 
-# Main execution function
+# Main execution function.
+#
+# Execute the main JAX on Spark automation workflow.
+#
+# Arguments:
+#   $1 - Command to execute (prerequisites, clone, build, run, full).
+#
+# Returns:
+#   0 - Automation process completed successfully.
+#   1 - Invalid command or process failed.
+#
+# Errors:
+#   Invalid command: Command not recognized.
 main() {
     log "Starting JAX on Spark automation..."
     

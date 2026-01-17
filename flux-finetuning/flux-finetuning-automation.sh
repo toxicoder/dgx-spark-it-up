@@ -1,38 +1,87 @@
 #!/bin/bash
 
-# Flux Finetuning Automation Script
-# This script automates the entire flux-finetuning process from the NVIDIA guide
+# Flux Finetuning Automation Script.
+#
+# This script automates the entire flux-finetuning process from the NVIDIA guide, including environment setup, model downloading, Docker image building, and container launching.
 
 set -e  # Exit on any error
 
 # Colors for output
+# RED color code for error messages
 RED='\033[0;31m'
+# GREEN color code for info messages
 GREEN='\033[0;32m'
+# YELLOW color code for warning messages
 YELLOW='\033[1;33m'
+# NC color code for no color (reset)
 NC='\033[0m' # No Color
 
-# Logging function
+# Logging function.
+#
+# Print an info message with green color prefix.
+#
+# Arguments:
+#   $1 - Message to log.
+#
+# Returns:
+#   0 - Success.
 log() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
+# Warning function.
+#
+# Print a warning message with yellow color prefix.
+#
+# Arguments:
+#   $1 - Warning message to log.
+#
+# Returns:
+#   0 - Success.
 warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+# Error function.
+#
+# Print an error message with red color prefix and exit.
+#
+# Arguments:
+#   $1 - Error message to log.
+#
+# Returns:
+#   1 - Error occurred and script exits.
 error() {
     echo -e "${RED}[ERROR]${NC} $1"
     exit 1
 }
 
-# Check if running on Linux
+# Check if running on Linux.
+#
+# Verify that the script is running on a Linux system.
+#
+# Returns:
+#   0 - Running on Linux.
+#   1 - Not running on Linux.
+#
+# Errors:
+#   This automation script is designed for Linux systems only: Non-Linux OS detected.
 check_os() {
     if [[ "$OSTYPE" != "linux-gnu"* ]]; then
         error "This automation script is designed for Linux systems only."
     fi
 }
 
-# Check Docker permissions
+# Check Docker permissions.
+#
+# Verify that Docker is properly configured with user permissions.
+#
+# Returns:
+#   0 - Docker permissions are properly configured.
+#   1 - Docker permissions need to be configured.
+#
+# Errors:
+#   Docker requires sudo permissions: User needs to be added to docker group.
 check_docker_permissions() {
     log "Checking Docker permissions..."
     if ! docker ps >/dev/null 2>&1; then
@@ -46,7 +95,12 @@ check_docker_permissions() {
     log "Docker permissions are properly configured"
 }
 
-# Clone the repository (if not already done)
+# Clone the repository (if not already done).
+#
+# Clone the dgx-spark-playbooks repository from GitHub if it doesn't exist locally.
+#
+# Returns:
+#   0 - Repository cloned or already exists.
 clone_repository() {
     if [[ ! -d "dgx-spark-playbooks" ]]; then
         log "Cloning dgx-spark-playbooks repository..."
@@ -56,7 +110,12 @@ clone_repository() {
     fi
 }
 
-# Setup directories
+# Setup directories.
+#
+# Create necessary directory structure for flux-finetuning assets.
+#
+# Returns:
+#   0 - Directories created successfully.
 setup_directories() {
     log "Setting up directories..."
     mkdir -p flux-finetuning/assets/models/loras
@@ -66,14 +125,28 @@ setup_directories() {
     mkdir -p flux-finetuning/assets/models/vae
 }
 
-# Check for HF_TOKEN
+# Check for HF_TOKEN.
+#
+# Verify that the Hugging Face token environment variable is set.
+#
+# Returns:
+#   0 - HF_TOKEN environment variable is set.
+#   1 - HF_TOKEN environment variable is not set.
+#
+# Errors:
+#   HF_TOKEN environment variable is not set: Hugging Face token required for model downloads.
 check_hf_token() {
     if [[ -z "$HF_TOKEN" ]]; then
         error "HF_TOKEN environment variable is not set. Please set it before running this script."
     fi
 }
 
-# Download model
+# Download model.
+#
+# Download the FLUX.1-dev model using the download script.
+#
+# Returns:
+#   0 - Model download completed or already exists.
 download_model() {
     log "Downloading FLUX.1-dev model..."
     cd flux-finetuning/assets
@@ -86,7 +159,12 @@ download_model() {
     cd - > /dev/null
 }
 
-# Build inference docker image
+# Build inference docker image.
+#
+# Build the Docker image for inference using the inference Dockerfile.
+#
+# Returns:
+#   0 - Inference Docker image built successfully.
 build_inference_image() {
     log "Building inference Docker image..."
     cd flux-finetuning/assets
@@ -94,7 +172,12 @@ build_inference_image() {
     cd - > /dev/null
 }
 
-# Build training docker image
+# Build training docker image.
+#
+# Build the Docker image for training using the training Dockerfile.
+#
+# Returns:
+#   0 - Training Docker image built successfully
 build_training_image() {
     log "Building training Docker image..."
     cd flux-finetuning/assets
@@ -102,7 +185,12 @@ build_training_image() {
     cd - > /dev/null
 }
 
-# Launch ComfyUI
+# Launch ComfyUI.
+#
+# Launch the ComfyUI container using the launch script.
+#
+# Returns:
+#   0 - ComfyUI container launched successfully.
 launch_comfyui() {
     log "Launching ComfyUI container..."
     cd flux-finetuning/assets
@@ -110,7 +198,12 @@ launch_comfyui() {
     cd - > /dev/null
 }
 
-# Launch training
+# Launch training.
+#
+# Launch the training process using the training script.
+#
+# Returns:
+#   0 - Training process launched successfully.
 launch_training() {
     log "Launching training..."
     cd flux-finetuning/assets
@@ -118,7 +211,12 @@ launch_training() {
     cd - > /dev/null
 }
 
-# Prepare dataset
+# Prepare dataset.
+#
+# Create dataset directories and configure data.toml if it exists.
+#
+# Returns:
+#   0 - Dataset preparation completed.
 prepare_dataset() {
     log "Preparing dataset..."
     # Create default dataset directories if they don't exist
@@ -137,7 +235,15 @@ prepare_dataset() {
     fi
 }
 
-# Main execution function
+# Main execution function.
+#
+# Execute the main flux-finetuning automation workflow.
+#
+# Arguments:
+#   $@ - All arguments passed to the script.
+#
+# Returns:
+#   0 - Automation process completed successfully.
 main() {
     log "Starting Flux Finetuning Automation Process"
     

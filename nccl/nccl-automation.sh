@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
-# =============================================================================
-# NVIDIA DGX Spark NCCL Automation Script
-# This script automates the complete NCCL setup process for DGX Spark nodes
-# Following the guide from: https://build.nvidia.com/spark/nccl
-# =============================================================================
+# NVIDIA DGX Spark NCCL Automation Script.
+#
+# This script automates the complete NCCL setup process for DGX Spark nodes, including network configuration, NCCL building, test suite building, and communication testing.
 
 # Bash strict mode
 set -euo pipefail
@@ -38,7 +36,15 @@ print_debug() {
     echo -e "${BLUE}[DEBUG]${NC} $1"
 }
 
-# Display usage information
+# usage - Display usage information for the script.
+#
+# Displays the usage instructions and available options for running this script.
+#
+# Parameters:
+#   None
+#
+# Returns:
+#   0 - Success.
 usage() {
     echo "Usage: $SCRIPT_NAME [OPTIONS]"
     echo ""
@@ -57,7 +63,13 @@ usage() {
     echo ""
 }
 
-# Check if running on DGX Spark system
+# check_dgx_spark_environment - Check if running on DGX Spark system.
+#
+# Checks if the script is running on a DGX Spark system and verifies required tools.
+#
+# Returns:
+#   0 - All requirements met.
+#   1 - Missing requirements.
 check_dgx_spark_environment() {
     print_status "Checking DGX Spark environment..."
     
@@ -81,7 +93,13 @@ check_dgx_spark_environment() {
     return 0
 }
 
-# Step 1: Configure network connectivity (simplified version)
+# configure_network_connectivity - Configure network connectivity.
+#
+# Configures network connectivity for NCCL setup, including physical cable connections
+# and passwordless SSH setup between nodes.
+#
+# Returns:
+#   0 - Network configuration completed.
 configure_network_connectivity() {
     print_status "Step 1: Configuring network connectivity"
     
@@ -100,7 +118,13 @@ configure_network_connectivity() {
     return 0
 }
 
-# Step 2: Build NCCL with Blackwell support
+# build_nccl - Build NCCL with Blackwell support.
+#
+# Builds NCCL with Blackwell support from source code.
+#
+# Returns:
+#   0 - NCCL built successfully.
+#   1 - Build failed.
 build_nccl() {
     print_status "Step 2: Building NCCL with Blackwell support"
     
@@ -132,7 +156,13 @@ build_nccl() {
     return 0
 }
 
-# Step 3: Build NCCL test suite
+# build_nccl_tests - Build NCCL test suite.
+#
+# Builds the NCCL test suite from source code.
+#
+# Returns:
+#   0 - NCCL tests built successfully.
+#   1 - Build failed.
 build_nccl_tests() {
     print_status "Step 3: Building NCCL test suite"
     
@@ -153,7 +183,13 @@ build_nccl_tests() {
     return 0
 }
 
-# Step 4: Find active network interface and IP addresses
+# find_network_interfaces - Find active network interface and IP addresses.
+#
+# Finds active network interfaces and determines IP addresses for NCCL communication.
+#
+# Returns:
+#   0 - Interface information retrieved.
+#   1 - Failed to determine interface information.
 find_network_interfaces() {
     print_status "Step 4: Finding active network interfaces and IP addresses"
     
@@ -196,7 +232,13 @@ find_network_interfaces() {
     return 0
 }
 
-# Step 5: Run NCCL communication test
+# run_nccl_test - Run NCCL communication test.
+#
+# Runs NCCL communication tests to verify multi-node connectivity.
+#
+# Returns:
+#   0 - Test completed.
+#   1 - Test failed.
 run_nccl_test() {
     print_status "Step 5: Running NCCL communication test"
     
@@ -233,7 +275,12 @@ run_nccl_test() {
     return 0
 }
 
-# Step 6: Cleanup and rollback
+# cleanup - Cleanup NCCL and NCCL tests directories.
+#
+# Cleans up NCCL and NCCL tests directories, removing build artifacts.
+#
+# Returns:
+#   0 - Cleanup completed.
 cleanup() {
     print_status "Step 6: Cleaning up NCCL and NCCL tests directories"
     
@@ -251,7 +298,16 @@ cleanup() {
     return 0
 }
 
-# Main function
+# main - Main execution function.
+#
+# Main execution function that orchestrates the complete NCCL setup process.
+#
+# Parameters:
+#   $@ (All) - Command line arguments.
+#
+# Returns:
+#   0 - Script completed successfully.
+#   1 - Script failed at some point.
 main() {
     local cleanup_only=false
     local verbose=false

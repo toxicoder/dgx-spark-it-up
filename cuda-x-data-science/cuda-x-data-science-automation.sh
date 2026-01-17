@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# CUDA-X Data Science Automation Script
-# This script automates the setup and execution of the CUDA-X Data Science workflow
+# CUDA-X Data Science Automation Script.
+#
+# This script automates the setup and execution of the CUDA-X Data Science workflow, including environment setup, library installation, repository cloning, and notebook execution.
 
 set -euo pipefail
 

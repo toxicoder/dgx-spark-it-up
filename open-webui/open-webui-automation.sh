@@ -1,22 +1,45 @@
 #!/bin/bash
 
-# Open WebUI Automation Script
-# This script automates the setup of Open WebUI with Ollama on DGX Spark
+# Open WebUI Automation Script.
+#
+# This script automates the setup of Open WebUI with Ollama on DGX Spark, including Docker setup, container management, model downloading, and verification.
 
 set -e  # Exit on any error
 
-# Function to log messages
+# log - Log informational messages.
+#
+# Logs informational messages to stdout with [INFO] prefix.
+#
+# Parameters:
+#   $1 (String) - Message to log.
+#
+# Returns:
+#   0 - Success.
 log() {
     echo "[INFO] $1"
 }
 
-# Function to error messages and exit
+# error - Log error messages and exit.
+#
+# Logs error messages to stderr with [ERROR] prefix and exits with code 1.
+#
+# Parameters:
+#   $1 (String) - Error message to log.
+#
+# Returns:
+#   1 - Error occurred.
 error() {
     echo "[ERROR] $1" >&2
     exit 1
 }
 
-# Function to check if docker is installed and accessible
+# check_docker - Check Docker installation and accessibility.
+#
+# Checks if Docker is installed and accessible, and verifies user has proper permissions.
+#
+# Returns:
+#   0 - Docker is accessible.
+#   1 - Docker not installed or inaccessible.
 check_docker() {
     if ! command -v docker &> /dev/null; then
         error "Docker is not installed. Please install Docker first."
@@ -34,13 +57,25 @@ check_docker() {
     fi
 }
 
-# Function to pull the Open WebUI container image
+# pull_container - Pull Open WebUI container image.
+#
+# Pulls the Open WebUI container image with Ollama from the remote registry.
+#
+# Returns:
+#   0 - Container image pulled successfully.
+#   1 - Failed to pull container image.
 pull_container() {
     log "Pulling Open WebUI container image with Ollama..."
     docker pull ghcr.io/open-webui/open-webui:ollama
 }
 
-# Function to start the Open WebUI container
+# start_container - Start Open WebUI container.
+#
+# Starts the Open WebUI container with required configurations and GPU access.
+#
+# Returns:
+#   0 - Container started successfully.
+#   1 - Failed to start container.
 start_container() {
     log "Starting Open WebUI container..."
     
@@ -69,7 +104,13 @@ start_container() {
     log "Open WebUI container is running at http://localhost:8080"
 }
 
-# Function to download and configure a model
+# download_model - Download and configure model.
+#
+# Downloads a specified model (gpt-oss:20b) using Ollama within the container.
+#
+# Returns:
+#   0 - Model downloaded successfully.
+#   1 - Failed to download model.
 download_model() {
     log "Downloading gpt-oss:20b model..."
     
@@ -80,7 +121,13 @@ download_model() {
     log "Model gpt-oss:20b downloaded successfully"
 }
 
-# Function to verify the setup
+# verify_setup - Verify Open WebUI setup.
+#
+# Verifies that the Open WebUI container is running and required volumes exist.
+#
+# Returns:
+#   0 - Setup verified successfully.
+#   1 - Setup verification failed.
 verify_setup() {
     log "Verifying Open WebUI setup..."
     
@@ -101,7 +148,12 @@ verify_setup() {
     log "Open WebUI setup verified successfully"
 }
 
-# Function to cleanup resources
+# cleanup - Cleanup Open WebUI resources.
+#
+# Cleans up all Open WebUI resources including containers, images, and volumes.
+#
+# Returns:
+#   0 - Cleanup completed successfully.
 cleanup() {
     log "Cleaning up Open WebUI resources..."
     
@@ -121,7 +173,13 @@ cleanup() {
     log "Cleanup completed successfully"
 }
 
-# Main function
+# main - Main execution function.
+#
+# Main execution function that orchestrates the complete Open WebUI setup process.
+#
+# Returns:
+#   0 - Script completed successfully.
+#   1 - Script failed at some point.
 main() {
     log "Starting Open WebUI automation setup..."
     
