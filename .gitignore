@@ -171,3 +171,6 @@ Temporary Items
 
 # BATS
 .bats/
+# Ignore TODO files
+TODO.md
+docs/mermaid
