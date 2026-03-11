@@ -290,6 +290,12 @@ _apply_bandwidth_limits() {
     local down_kbps=$(( down_mbps * BANDWIDTH_UNIT_MULTIPLIER ))
     local up_kbps=$(( up_mbps * BANDWIDTH_UNIT_MULTIPLIER ))
 
+    # Clear any existing limits first to avoid conflicts
+    echo "[i] Clearing existing bandwidth limits on ${interface}..."
+    if _check_wondershaper_installed; then
+        sudo wondershaper clear "${interface}" 2>/dev/null || true
+    fi
+
     _format_bandwidth_display "$down_mbps" "$up_mbps"
     
     sudo wondershaper "$interface" "$down_kbps" "$up_kbps"
