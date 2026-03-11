@@ -171,3 +171,10 @@ Temporary Items
 
 # BATS
 .bats/
+
+# Embedded git repositories (not tracked by git, removed to eliminate external deps)
+bats-core/
+dgx-spark-playbooks/
+# Ignore TODO files
+TODO.md
+docs/mermaid
