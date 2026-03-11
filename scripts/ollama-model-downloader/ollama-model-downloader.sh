@@ -282,55 +282,23 @@ _install_wondershaper() {
 # Bandwidth Control Module
 # ==========================================
 
-# Bandwidth limit constants for tc commands
-readonly TC_BURST="32kbit"
-readonly TC_LATENCY="50ms"
-
 _apply_bandwidth_limits() {
     local interface="$1"
     local down_mbps="$2"
     local up_mbps="$3"
 
-    # Use mbit for tc commands (more direct conversion)
-    local down_rate="${down_mbps}mbit"
-    local up_rate="${up_mbps}mbit"
+    local down_kbps=$(( down_mbps * BANDWIDTH_UNIT_MULTIPLIER ))
+    local up_kbps=$(( up_mbps * BANDWIDTH_UNIT_MULTIPLIER ))
 
-    # Clear existing limits first to avoid conflicts
-    echo "[i] Clearing existing bandwidth limits on ${interface}..."
-    sudo tc qdisc del dev "$interface" root 2>/dev/null || true
-    sudo tc qdisc del dev "$interface" ingress 2>/dev/null || true
-
-    # Clear any existing limits first to avoid conflicts
-    echo "[i] Clearing existing bandwidth limits on ${interface}..."
+    # Clear any existing limits first
     if _check_wondershaper_installed; then
         sudo wondershaper clear "${interface}" 2>/dev/null || true
     fi
 
     _format_bandwidth_display "$down_mbps" "$up_mbps"
     
-    # Apply download limit using token bucket filter (tbf)
-    echo "[i] Applying download limit: ${down_rate}..."
-    if ! sudo tc qdisc add dev "$interface" root handle 1: tbf rate "$down_rate" burst "$TC_BURST" latency "$TC_LATENCY" 2>&1; then
-        # If root qdisc fails, try ingress with sfq
-        echo "[i] Retrying with ingress qdisc..."
-        if ! sudo tc qdisc add dev "$interface" handle ffff: ingress 2>&1; then
-            echo "[!] Warning: Failed to apply bandwidth limits" >&2
-        else
-            echo "[OK] Ingress qdisc added successfully"
-        fi
-    else
-        echo "[OK] Download limit applied successfully"
-    fi
-    
-    # Apply upload limit if not default (uncapped)
-    if [[ "$up_mbps" -ne "$DEFAULT_UPLOAD_MBPS" ]]; then
-        echo "[i] Applying upload limit: ${up_rate}..."
-        if ! sudo tc qdisc add dev "$interface" handle 2: tbf rate "$up_rate" burst "$TC_BURST" latency "$TC_LATENCY" 2>&1; then
-            echo "[!] Warning: Failed to apply upload limit" >&2
-        else
-            echo "[OK] Upload limit applied successfully"
-        fi
-    fi
+    # Apply bandwidth limits using wondershaper
+    sudo wondershaper "$interface" "$down_kbps" "$up_kbps"
 }
 
 _clear_bandwidth_limits() {
@@ -338,21 +306,12 @@ _clear_bandwidth_limits() {
     
     echo -e "\n[Cleanup] Removing bandwidth limits from ${interface}..."
     
-    # Clear root qdisc
-    echo "[i] Clearing root qdisc..."
-    sudo tc qdisc del dev "$interface" root 2>/dev/null || true
-    
-    # Clear ingress qdisc
-    echo "[i] Clearing ingress qdisc..."
-    sudo tc qdisc del dev "$interface" ingress 2>/dev/null || true
-    
-    # Also clear wondershaper if available
     if _check_wondershaper_installed; then
-        echo "[i] Clearing wondershaper limits..."
-        sudo wondershaper clear "${interface}" 2>/dev/null || true
+        sudo wondershaper clear "${interface}" &>/dev/null || true
+        echo "[i] Limits cleared. Exiting safely."
+    else
+        echo "[i] Wondershaper not installed, no limits to clear."
     fi
-    
-    echo "[i] Limits cleared. Exiting safely."
 }
 
 _register_cleanup_handlers() {
