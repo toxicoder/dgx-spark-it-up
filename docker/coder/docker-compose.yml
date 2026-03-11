@@ -1,0 +1,73 @@
+services:
+  coder:
+    image: ghcr.io/coder/coder:latest
+    container_name: coder-server
+    ports:
+      - "${CODER_PORT:-7080}:7080"
+    environment:
+      # The URL where users will access Coder.
+      # Change this to your public IP or domain (e.g., http://coder.example.com)
+      # Important: Use your server's public IP or domain name, not localhost
+      CODER_ACCESS_URL: "${CODER_ACCESS_URL:-http://localhost:7080}"
+      CODER_ADDRESS: "${CODER_ADDRESS:-0.0.0.0:7080}"
+      # PostgreSQL connection URL for Coder's backend storage
+      # Format: postgresql://user:password@host:port/database?sslmode=mode
+      CODER_PG_CONNECTION_URL: "${CODER_PG_CONNECTION_URL}"
+      # Optional: Enable telemetry or disable update checks
+      CODER_TELEMETRY_ENABLE: "${CODER_TELEMETRY_ENABLE:-true}"
+      CODER_UPDATE_CHECK: "${CODER_UPDATE_CHECK:-true}"
+    # To allow Coder to provision Docker containers on the host:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Optional: Grant access to Docker socket by adding container to docker group
+    # Get your host's Docker group ID with: getent group docker | cut -d: -f3
+    group_add:
+      - "${DOCKER_GROUP_ID:-996}"
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - coder-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  database:
+    image: "postgres:16-alpine"
+    container_name: coder-database
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - coder_data:/var/lib/postgresql/data
+      # Optional: Persist PostgreSQL configuration
+      # - ./postgres-config:/etc/postgresql:ro
+    environment:
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      # Uncomment to expose PostgreSQL directly (not recommended for production)
+      # - "5432:5432"
+    networks:
+      - coder-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  coder_data:
+    name: coder-postgres-data
+    driver: local
+
+networks:
+  coder-network:
+    name: coder-network
+    driver: bridge
