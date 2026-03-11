@@ -1,4 +1,90 @@
 services:
+  # --- OLLAMA (GPU shared via --gpus "all") ---
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ollama:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    networks:
+      - litellm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # --- NVIDIA NIM: LLAMA 3.1 8B (GPU shared via --gpus "all") ---
+  nim-llama-8b:
+    image: nvcr.io/nim/meta/llama-3.1-8b-instruct:latest
+    container_name: nim-llama-8b
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    shm_size: ${NIM_SHM_SIZE:-16GB}
+    environment:
+      - NGC_API_KEY=${NGC_API_KEY}
+      - VLLM_ATTENTION_BACKEND=FLASH_ATTN
+      - VLLM_USE_FLASHINFER_MOE_MXFP4_MXFP8_CUTLASS=1
+    volumes:
+      - nim-cache:/opt/nim/.cache
+    ports:
+      - "${NIM_LLAMA_PORT:-8000}:8000"
+    networks:
+      - litellm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # --- NVIDIA NIM: QWEN3 32B (GPU shared via --gpus "all") ---
+  nim-qwen-32b:
+    image: nvcr.io/nim/qwen/qwen3-32b-instruct:latest
+    container_name: nim-qwen-32b
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    shm_size: ${NIM_SHM_SIZE:-16GB}
+    environment:
+      - NGC_API_KEY=${NGC_API_KEY}
+      - NIM_TAGS_SELECTOR=profile=latency
+      - VLLM_USE_FLASHINFER_MOE_FP4=1
+    volumes:
+      - nim-cache:/opt/nim/.cache
+    ports:
+      - "${NIM_QWEN_PORT:-8001}:8001"
+    networks:
+      - litellm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # --- LITELLM PROXY ---
   litellm:
     image: ghcr.io/berriai/litellm:main-stable
     container_name: litellm-proxy
@@ -22,6 +108,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
+      nim-llama-8b:
+        condition: service_healthy
+      nim-qwen-32b:
+        condition: service_healthy
     networks:
       - litellm-network
     restart: unless-stopped
@@ -32,6 +124,7 @@ services:
       retries: 3
       start_period: 60s
 
+  # --- POSTGRES DATABASE ---
   db:
     image: postgres:16-alpine
     container_name: litellm-database
@@ -42,8 +135,6 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     volumes:
       - litellm_db_data:/var/lib/postgresql/data
-      # Optional: Persist PostgreSQL configuration
-      # - ./postgres-config:/etc/postgresql:ro
     ports:
       # Uncomment to expose PostgreSQL directly (not recommended for production)
       # - "5432:5432"
@@ -63,6 +154,12 @@ volumes:
     driver: local
   litellm_config_data:
     name: litellm-config-data
+    driver: local
+  ollama:
+    name: litellm-ollama-data
+    driver: local
+  nim-cache:
+    name: litellm-nim-cache
     driver: local
 
 networks:
