@@ -56,7 +56,8 @@
                 "ms-vscode.azure-repos",
                 "bierner.markdown-mermaid",
                 "ecmel.vscode-html-css",
-                "jay-youngn.vscode-proto3-next"
+                "jay-youngn.vscode-proto3-next",
+                "kilocode.Kilo-Code"
             ],
             "settings": {
                 "terminal.integrated.shellExecutionOrder": "pTY",
