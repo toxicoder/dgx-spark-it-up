@@ -1,0 +1,39 @@
+model_list:
+  # --- NVIDIA NIM MODELS (Local on DGX Spark) ---
+  # Assuming NIM is running in a container on port 8000
+  - model_name: nim-llama-3.1-8b
+    litellm_params:
+      model: nvidia_nim/meta/llama-3.1-8b-instruct
+      api_base: http://host.docker.internal:8000/v1
+      api_key: "not-needed-for-local"
+
+  - model_name: nim-qwen3-32b
+    litellm_params:
+      model: nvidia_nim/qwen/qwen3-32b-instruct
+      api_base: http://host.docker.internal:8001/v1
+      api_key: "not-needed-for-local"
+
+  # --- OLLAMA MODELS (Local) ---
+  - model_name: ollama-llama4-8b # Llama 4 is the 2026 standard
+    litellm_params:
+      model: ollama/llama4:8b
+      api_base: http://host.docker.internal:11434
+
+  - model_name: deepseek-coder
+    litellm_params:
+      model: ollama/deepseek-coder-v2:16b
+      api_base: http://host.docker.internal:11434
+
+  # --- HYBRID CLOUD OPTION (NVIDIA API Catalog) ---
+  - model_name: nvidia-nemotron-70b
+    litellm_params:
+      model: nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct
+      api_key: os.environ/NVIDIA_NIM_API_KEY # Pulled from .env
+
+router_settings:
+  routing_strategy: latency-based-routing
+  enable_pre_call_checks: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
