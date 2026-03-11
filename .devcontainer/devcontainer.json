@@ -81,5 +81,5 @@
             "version": "24"
         }
     },
-    "postCreateCommand": "echo 'Bats is already installed at /usr/local/bin/bats'"
+    "postCreateCommand": "if ! command -v bats &> /dev/null; then sudo apt-get update && sudo apt-get install -y bats && sudo ln -sf /usr/bin/bats /usr/local/bin/bats; fi"
 }

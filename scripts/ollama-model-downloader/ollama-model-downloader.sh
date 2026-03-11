@@ -201,7 +201,8 @@ _pull_single_model() {
 
 _process_models_file() {
     local file="$1"
-    local -n models_ref=$2
+    local models_varname="$2"
+    local -n _models_ref="$models_varname"
     
     if [[ ! -f "$file" ]]; then
         echo "[X] Error: File '$file' not found." >&2
@@ -216,7 +217,7 @@ _process_models_file() {
         
         # Skip empty lines and comments
         if [[ -n "$line" && ! "$line" =~ ^# ]]; then
-            models_ref+=("$line")
+            _models_ref+=("$line")
         fi
     done < "$file"
 }
@@ -359,25 +360,53 @@ _parse_command_args() {
     
     # Now parse remaining args with getopts
     if [[ ${#filtered_args[@]} -gt 0 ]]; then
-        local OPTIND
-        while getopts "cd:u:m:f:h" opt "${filtered_args[@]}"; do
-            case "${opt}" in
-                c) clear_only_ref=true ;;
-                d) 
-                    _validate_download_limit "${OPTARG}"
-                    down_ref="${OPTARG}" 
+        local OPTIND=1
+        # Convert filtered_args to a string for getopts
+        local optstring=""
+        for arg in "${filtered_args[@]}"; do
+            optstring+="$arg "
+        done
+        
+        # Use a subshell to avoid affecting the main script's OPTIND
+        local -a args=("${filtered_args[@]}")
+        local i=0
+        while [[ $i -lt ${#args[@]} ]]; do
+            local arg="${args[$i]}"
+            case "$arg" in
+                -c) clear_only_ref=true; ((i++)) || true ;;
+                -d) 
+                    ((i++)) || true
+                    _validate_download_limit "${args[$i]}"
+                    down_ref="${args[$i]}"
+                    ((i++)) || true
                     ;;
-                u) 
-                    _validate_upload_limit "${OPTARG}"
-                    up_ref="${OPTARG}" 
+                -u) 
+                    ((i++)) || true
+                    _validate_upload_limit "${args[$i]}"
+                    up_ref="${args[$i]}"
+                    ((i++)) || true
                     ;;
-                m) models_ref+=("${OPTARG}") ;;
-                f) _process_models_file "${OPTARG}" models_ref ;;
-                h) 
+                -m) 
+                    ((i++)) || true
+                    models_ref+=("${args[$i]}")
+                    ((i++)) || true
+                    ;;
+                -f) 
+                    ((i++)) || true
+                    _process_models_file "${args[$i]}" "models_ref"
+                    ((i++)) || true
+                    ;;
+                -h) 
                     help_requested_ref=true
                     return 0
                     ;;
-                *) 
+                --help|--usage)
+                    help_requested_ref=true
+                    _show_usage
+                    return 0
+                    ;;
+                *)
+                    echo "[X] Error: Unknown option: $arg" >&2
                     return 1
                     ;;
             esac
