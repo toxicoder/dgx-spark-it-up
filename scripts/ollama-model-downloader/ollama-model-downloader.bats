@@ -65,10 +65,10 @@ setup() {
     echo "$output" | grep -q "Download limit"
 }
 
-@test "script shows error when no models are specified" {
+@test "script applies bandwidth limits with only download limit (no models)" {
     run ./ollama-model-downloader.sh -d 50
-    [ "$status" -ne 0 ]
-    echo "$output" | grep -q "No valid models found"
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "Bandwidth limits applied. Exiting without downloading models."
 }
 
 @test "script shows error when invalid download limit is provided" {
