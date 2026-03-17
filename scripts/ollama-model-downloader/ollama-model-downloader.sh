@@ -106,7 +106,7 @@ _validate_upload_limit() {
 }
 
 _validate_models_provided() {
-    local -n models_ref=$1
+    local models_ref=("$@")
     if [[ ${#models_ref[@]} -eq 0 ]]; then
         echo "[X] Error: No valid models found to download."
         echo "$USAGE_MSG"
@@ -201,8 +201,7 @@ _pull_single_model() {
 
 _process_models_file() {
     local file="$1"
-    local models_varname="$2"
-    local -n _models_ref="$models_varname"
+    local -a models_ref=()
     
     if [[ ! -f "$file" ]]; then
         echo "[X] Error: File '$file' not found." >&2
@@ -217,9 +216,13 @@ _process_models_file() {
         
         # Skip empty lines and comments
         if [[ -n "$line" && ! "$line" =~ ^# ]]; then
-            _models_ref+=("$line")
+            models_ref+=("$line")
         fi
     done < "$file"
+    
+    # Return the models_ref array
+    # This is a workaround for bash 3.2 which doesn't support nameref
+    echo "${models_ref[@]}"
 }
 
 # ==========================================
@@ -327,121 +330,68 @@ _show_usage() {
     echo "$USAGE_MSG"
 }
 
-# Parse command arguments. Returns 0 on success, 1 on error, and exits on -h/--help
-# Sets: down_ref, up_ref, models_ref, clear_only_ref, help_requested_ref
-_parse_command_args() {
-    local -n down_ref=$1
-    local -n up_ref=$2
-    local -n models_ref=$3
-    local -n clear_only_ref=$4
-    local -n help_requested_ref=$5
-    
-    help_requested_ref=false
-    
-    # Shift past the 5 nameref parameter names to get to actual arguments
-    shift 5
-    
-    # Now $1, $2, etc. refer to the actual command-line arguments
-    local -a actual_args=("$@")
-    
-    # Handle long options and -h before getopts
-    for arg in "${actual_args[@]}"; do
-        case "$arg" in
-            --help|--usage|-h)
-                help_requested_ref=true
-                _show_usage
-                return 0
-                ;;
-        esac
-    done
-    
-    # Filter out --help, --usage, -h for getopts processing
-    local -a filtered_args=()
-    for arg in "${actual_args[@]}"; do
-        case "$arg" in
-            --help|--usage|-h) continue ;;
-            *) filtered_args+=("$arg") ;;
-        esac
-    done
-    
-    # Now parse remaining args with getopts
-    if [[ ${#filtered_args[@]} -gt 0 ]]; then
-        local OPTIND=1
-        # Convert filtered_args to a string for getopts
-        local optstring=""
-        for arg in "${filtered_args[@]}"; do
-            optstring+="$arg "
-        done
-        
-        # Use a subshell to avoid affecting the main script's OPTIND
-        local -a args=("${filtered_args[@]}")
-        local i=0
-        while [[ $i -lt ${#args[@]} ]]; do
-            local arg="${args[$i]}"
-            case "$arg" in
-                -c) clear_only_ref=true; ((i++)) || true ;;
-                -d) 
-                    ((i++)) || true
-                    _validate_download_limit "${args[$i]}"
-                    down_ref="${args[$i]}"
-                    ((i++)) || true
-                    ;;
-                -u) 
-                    ((i++)) || true
-                    _validate_upload_limit "${args[$i]}"
-                    up_ref="${args[$i]}"
-                    ((i++)) || true
-                    ;;
-                -m) 
-                    ((i++)) || true
-                    models_ref+=("${args[$i]}")
-                    ((i++)) || true
-                    ;;
-                -f) 
-                    ((i++)) || true
-                    _process_models_file "${args[$i]}" "models_ref"
-                    ((i++)) || true
-                    ;;
-                -h) 
-                    help_requested_ref=true
-                    return 0
-                    ;;
-                --help|--usage)
-                    help_requested_ref=true
-                    _show_usage
-                    return 0
-                    ;;
-                *)
-                    echo "[X] Error: Unknown option: $arg" >&2
-                    return 1
-                    ;;
-            esac
-        done
-    fi
-    
-    return 0
-}
-
 # ==========================================
 # Main Entry Point
 # ==========================================
 
 _main() {
+    # Parse command arguments manually to avoid bash 3.2 nameref incompatibility
     local down_mbps=""
     local up_mbps="$DEFAULT_UPLOAD_MBPS"
     local models_queue=()
     local clear_only=false
     local help_requested=false
-
-    # 1. Parse Arguments
-    _parse_command_args down_mbps up_mbps models_queue clear_only help_requested "$@"
+    
+    # Parse command arguments manually
+    local -a args=("$@")
+    local i=0
+    
+    while [[ $i -lt ${#args[@]} ]]; do
+        local arg="${args[$i]}"
+        case "$arg" in
+            -c) clear_only=true; ((i++)) || true ;;
+            -d) 
+                ((i++)) || true
+                _validate_download_limit "${args[$i]}"
+                down_mbps="${args[$i]}"
+                ((i++)) || true
+                ;;
+            -u) 
+                ((i++)) || true
+                _validate_upload_limit "${args[$i]}"
+                up_mbps="${args[$i]}"
+                ((i++)) || true
+                ;;
+            -m) 
+                ((i++)) || true
+                models_queue+=("${args[$i]}")
+                ((i++)) || true
+                ;;
+            -f) 
+                ((i++)) || true
+                local models_from_file
+                models_from_file=$(_process_models_file "${args[$i]}")
+                IFS=' ' read -r -a models_queue <<< "$models_from_file"
+                ((i++)) || true
+                ;;
+            -h|--help|--usage)
+                help_requested=true
+                _show_usage
+                exit 0
+                ;;
+            *)
+                echo "[X] Error: Unknown option: $arg" >&2
+                exit 1
+                ;;
+        esac
+    done
 
     # Exit immediately if help was requested
     if [[ "$help_requested" == true ]]; then
         exit 0
     fi
 
-    # 2. Handle Emergency Clear Failsafe (-c)
+    # Handle Emergency Clear Failsafe (-c)
     if [[ "$clear_only" == true ]]; then
         local active_interface
         active_interface=$(_get_active_interface)
@@ -450,16 +400,35 @@ _main() {
         exit 0
     fi
 
-    # 3. Validate Required Inputs for Normal Operation
+    # Validate Required Inputs for Normal Operation
     if [[ -z "$down_mbps" ]]; then
         echo "[X] Error: Download limit (-d) is required unless using (-c) to clear limits."
         echo "$USAGE_MSG"
         exit 1
     fi
 
-    _validate_models_provided models_queue
+    # Handle cases where no models are specified but download limit is provided.
+    if [ ${#models_queue[@]} -eq 0 ]; then
+        # Apply bandwidth limits only, no model downloads.
+        _install_wondershaper
+        
+        local active_interface
+        active_interface=$(_get_active_interface)
+        _validate_interface_detected "$active_interface"
+        _validate_interface_usable "$active_interface"
 
-    # 4. Setup Dependencies & Interface
+        echo "[i] Detected active internet interface: $active_interface"
+
+        # Register cleanup trap to remove limits on exit (even though we'll exit immediately, it's safe)
+        _register_cleanup_handlers "$active_interface"
+
+        _apply_bandwidth_limits "$active_interface" "$down_mbps" "$up_mbps"
+        
+        echo "[i] Bandwidth limits applied. Exiting without downloading models."
+        exit 0
+    fi
+
+    # Setup Dependencies & Interface
     _install_wondershaper
     
     local active_interface
@@ -469,10 +438,10 @@ _main() {
     
     echo "[i] Detected active internet interface: $active_interface"
 
-    # 5. Register the Cleanup Trap
+    # Register the Cleanup Trap
     _register_cleanup_handlers "$active_interface"
 
-    # 6. Execute Core Logic
+    # Execute Core Logic
     _apply_bandwidth_limits "$active_interface" "$down_mbps" "$up_mbps"
     
     local success=true
